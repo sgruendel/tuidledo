@@ -49,7 +49,8 @@ Visible tasks are sorted by priority first, then due date.
 
 - `j` / `k` or arrows: move selection
 - `g` / `G`: jump to top/bottom
-- `[` / `]` or `tab`: switch context
+- `tab` / `shift+tab`: jump between priority groups
+- `[` / `]`: switch context
 - `/`: search visible task titles
 - `space`: complete selected task
 - `enter`: show task details

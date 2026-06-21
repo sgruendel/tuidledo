@@ -199,9 +199,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.visible) > 0 {
 			m.cursor = len(m.visible) - 1
 		}
-	case "tab", "]":
+	case "tab":
+		m.nextPriority()
+	case "shift+tab":
+		m.prevPriority()
+	case "]":
 		m.nextContext()
-	case "shift+tab", "[":
+	case "[":
 		m.prevContext()
 	case "/":
 		m.state = stateSearch
@@ -323,6 +327,45 @@ func (m *Model) prevContext() {
 	m.refreshVisible()
 }
 
+func (m *Model) nextPriority() {
+	if len(m.visible) == 0 {
+		return
+	}
+	current := m.visible[m.cursor].Priority
+	for i := m.cursor + 1; i < len(m.visible); i++ {
+		if m.visible[i].Priority != current {
+			m.cursor = i
+			return
+		}
+	}
+	m.cursor = 0
+}
+
+func (m *Model) prevPriority() {
+	if len(m.visible) == 0 {
+		return
+	}
+	current := m.visible[m.cursor].Priority
+	for i := m.cursor - 1; i >= 0; i-- {
+		if m.visible[i].Priority != current {
+			targetPriority := m.visible[i].Priority
+			for i > 0 && m.visible[i-1].Priority == targetPriority {
+				i--
+			}
+			m.cursor = i
+			return
+		}
+	}
+	lastPriority := m.visible[len(m.visible)-1].Priority
+	for i := len(m.visible) - 1; i >= 0; i-- {
+		if m.visible[i].Priority != lastPriority {
+			m.cursor = i + 1
+			return
+		}
+	}
+	m.cursor = 0
+}
+
 func (m Model) contextName() string {
 	if m.contextIndex == 0 {
 		return "All"
@@ -347,14 +390,24 @@ func (m Model) taskView() string {
 	if len(m.visible) == 0 {
 		b.WriteString("No visible MYN tasks.\n")
 	} else {
+		lastPriority := -2
 		for i, task := range m.visible {
+			if task.Priority != lastPriority {
+				if i > 0 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(priorityHeaderStyle.Render(myn.PriorityLabel(task.Priority)))
+				b.WriteByte('\n')
+				lastPriority = task.Priority
+			}
+
 			cursor := "  "
 			style := lipgloss.NewStyle()
 			if i == m.cursor {
 				cursor = "> "
 				style = selectedStyle
 			}
-			line := fmt.Sprintf("%s%-4s  due %-10s  start %-10s  %-8s %s", cursor, myn.PriorityLabel(task.Priority), myn.DateLabel(task.DueDate), myn.DateLabel(task.StartDate), repeatLabel(task.Repeat), task.Title)
+			line := fmt.Sprintf("%sdue %-10s  start %-10s  %-8s %s", cursor, myn.DateLabel(task.DueDate), myn.DateLabel(task.StartDate), repeatLabel(task.Repeat), task.Title)
 			b.WriteString(style.Render(line))
 			b.WriteByte('\n')
 		}
@@ -365,7 +418,7 @@ func (m Model) taskView() string {
 		b.WriteString(subtleStyle.Render(m.message))
 		b.WriteString("\n")
 	}
-	b.WriteString(helpStyle.Render("j/k move | g/G top/bottom | [ ] context | / search | space complete | enter details | r refresh | ? help | q quit"))
+	b.WriteString(helpStyle.Render("j/k move | tab/S-tab priority | [ ] context | / search | space complete | enter details | r refresh | ? help | q quit"))
 	b.WriteByte('\n')
 	return b.String()
 }
@@ -384,7 +437,8 @@ func (m Model) helpView() string {
 
 j/k, arrows       move selection
 g/G               jump to top/bottom
-[ / ], tab        switch context
+tab/shift+tab     jump between priority groups
+[ / ]             switch context
 /                 search visible task titles
 space             complete selected task
 enter             show task details
@@ -412,9 +466,10 @@ func emptyDash(value string) string {
 }
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	subtleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-	helpStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("238"))
+	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	subtleStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	helpStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	priorityHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111"))
+	selectedStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("238"))
 )
