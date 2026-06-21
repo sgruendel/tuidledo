@@ -396,7 +396,7 @@ func (m Model) taskView() string {
 				if i > 0 {
 					b.WriteByte('\n')
 				}
-				b.WriteString(priorityHeaderStyle.Render(myn.PriorityLabel(task.Priority)))
+				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("  %-10s  %-10s  %-8s %s", "Start", "Due", "Repeat", myn.PriorityLabel(task.Priority))))
 				b.WriteByte('\n')
 				lastPriority = task.Priority
 			}
@@ -407,7 +407,7 @@ func (m Model) taskView() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			line := fmt.Sprintf("%sdue %-10s  start %-10s  %-8s %s", cursor, myn.DateLabel(task.DueDate), myn.DateLabel(task.StartDate), repeatLabel(task.Repeat), task.Title)
+			line := fmt.Sprintf("%s%-10s  %-10s  %-8s %s", cursor, myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), repeatLabel(task.Repeat), task.Title)
 			b.WriteString(style.Render(line))
 			b.WriteByte('\n')
 		}
