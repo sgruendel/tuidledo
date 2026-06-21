@@ -63,7 +63,7 @@ func New() Model {
 	if cfg.ClientSecret == "" {
 		cfg.ClientSecret = os.Getenv("TOODLEDO_CLIENT_SECRET")
 	}
-	m := Model{cfg: cfg, state: stateLoading, message: "Starting tuidledo..."}
+	m := Model{cfg: cfg, state: stateLoading, message: "Starting tuidledo...\n\nIf authorization is needed, open the URL printed below and return here after approving access."}
 	if err != nil {
 		m.state = stateError
 		m.err = err

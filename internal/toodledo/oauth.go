@@ -71,7 +71,7 @@ func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 	defer server.Shutdown(context.Background())
 
 	authURL := authorizeURL(clientID, state)
-	fmt.Fprintf(os.Stderr, "Open this URL to authorize tuidledo:\n%s\n\nRedirect URI: %s\n", authURL, redirectURI)
+	fmt.Fprintf(os.Stderr, "\r\nOpen this URL to authorize tuidledo:\r\n\r\n%s\r\n\r\nRedirect URI: %s\r\n\r\nWaiting for browser callback...\r\n", authURL, redirectURI)
 	select {
 	case result := <-resultCh:
 		result.AuthURL = authURL
