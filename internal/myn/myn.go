@@ -34,14 +34,14 @@ func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time
 		if left.Priority != right.Priority {
 			return left.Priority > right.Priority
 		}
-		if left.DueDate == 0 && right.DueDate != 0 {
+		if left.StartDate == 0 && right.StartDate != 0 {
 			return false
 		}
-		if left.DueDate != 0 && right.DueDate == 0 {
+		if left.StartDate != 0 && right.StartDate == 0 {
 			return true
 		}
-		if left.DueDate != right.DueDate {
-			return left.DueDate < right.DueDate
+		if left.StartDate != right.StartDate {
+			return left.StartDate > right.StartDate
 		}
 		return strings.ToLower(left.Title) < strings.ToLower(right.Title)
 	})

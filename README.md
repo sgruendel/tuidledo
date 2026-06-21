@@ -43,7 +43,7 @@ The task list hides:
 - negative-priority tasks
 - tasks with a future start date
 
-Visible tasks are sorted by priority first, then due date.
+Visible tasks are sorted by priority first, then start date descending within each priority group.
 
 ## Keybindings
 
