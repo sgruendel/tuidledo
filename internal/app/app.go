@@ -500,7 +500,7 @@ func (m Model) taskView() string {
 				if i > 0 {
 					b.WriteByte('\n')
 				}
-				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("  %-10s  %-10s  %-8s %s", "Start", "Due", "Repeat", myn.PriorityLabel(task.Priority))))
+				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("  %-10s  %-10s  %-18s %s", "Start", "Due", "Repeat", myn.PriorityLabel(task.Priority))))
 				b.WriteByte('\n')
 				lastPriority = task.Priority
 			}
@@ -511,7 +511,7 @@ func (m Model) taskView() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			line := fmt.Sprintf("%s%-10s  %-10s  %-8s %s", cursor, myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), repeatLabel(task.Repeat), task.Title)
+			line := fmt.Sprintf("%s%-10s  %-10s  %-18s %s", cursor, myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), task.Title)
 			b.WriteString(style.Render(line))
 			b.WriteByte('\n')
 		}
@@ -533,7 +533,7 @@ func (m Model) detailView() string {
 	}
 	task := m.visible[m.cursor]
 	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), emptyDash(task.Note), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), emptyDash(task.Note), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
 }
 
 func (m Model) createView() string {
@@ -559,13 +559,6 @@ ctrl+c            quit
 
 Register redirect URI: http://127.0.0.1:8765/callback
 ` + "\n"
-}
-
-func repeatLabel(repeat string) string {
-	if repeat == "" {
-		return "-"
-	}
-	return "repeat"
 }
 
 func emptyDash(value string) string {
