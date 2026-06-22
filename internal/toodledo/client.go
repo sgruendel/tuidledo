@@ -14,7 +14,7 @@ import (
 
 const baseURL = "https://api.toodledo.com/3"
 
-const taskFields = "priority,startdate,duedate,repeat,context,note"
+const taskFields = "priority,startdate,duedate,repeat,context,note,attachment"
 
 type Client struct {
 	HTTPClient   *http.Client

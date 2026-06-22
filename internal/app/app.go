@@ -532,8 +532,8 @@ func (m Model) detailView() string {
 		return m.taskView()
 	}
 	task := m.visible[m.cursor]
-	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), emptyDash(task.Note), helpStyle.Render("space complete | esc/q back"))
+	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\nAttachments:\n%s\n\n%s\n",
+		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), emptyDash(task.Note), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
 }
 
 func (m Model) createView() string {
@@ -573,6 +573,22 @@ func emptyDash(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func attachmentList(attachments []toodledo.Attachment) string {
+	if len(attachments) == 0 {
+		return "-"
+	}
+	var b strings.Builder
+	for i, attachment := range attachments {
+		if i > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(emptyDash(attachment.Kind))
+		b.WriteString(": ")
+		b.WriteString(emptyDash(attachment.Name))
+	}
+	return b.String()
 }
 
 func trimLastRune(value string) string {
