@@ -25,6 +25,7 @@ type Task struct {
 	DueDate   int64  `json:"duedate"`
 	Repeat    string `json:"repeat"`
 	Context   int64  `json:"context"`
+	Note      string `json:"note"`
 }
 
 type APIError struct {

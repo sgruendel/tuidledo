@@ -14,6 +14,8 @@ import (
 
 const baseURL = "https://api.toodledo.com/3"
 
+const taskFields = "priority,startdate,duedate,repeat,context,note"
+
 type Client struct {
 	HTTPClient   *http.Client
 	AccessToken  string
@@ -61,7 +63,7 @@ func (c *Client) GetContexts(ctx context.Context) ([]Context, error) {
 func (c *Client) GetTasks(ctx context.Context) ([]Task, error) {
 	params := url.Values{}
 	params.Set("comp", "0")
-	params.Set("fields", "priority,startdate,duedate,repeat,context")
+	params.Set("fields", taskFields)
 
 	var raw []json.RawMessage
 	if err := c.get(ctx, "/tasks/get.php", params, &raw); err != nil {
@@ -101,7 +103,7 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	}
 	params := url.Values{}
 	params.Set("tasks", string(payload))
-	params.Set("fields", "priority,startdate,duedate,repeat,context")
+	params.Set("fields", taskFields)
 
 	var raw []json.RawMessage
 	if err := c.post(ctx, "/tasks/add.php", params, &raw); err != nil {
@@ -129,7 +131,7 @@ func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt tim
 	params := url.Values{}
 	params.Set("tasks", string(payload))
 	params.Set("reschedule", "1")
-	params.Set("fields", "priority,startdate,duedate,repeat,context")
+	params.Set("fields", taskFields)
 
 	var raw []json.RawMessage
 	if err := c.post(ctx, "/tasks/edit.php", params, &raw); err != nil {

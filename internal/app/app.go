@@ -532,8 +532,8 @@ func (m Model) detailView() string {
 		return m.taskView()
 	}
 	task := m.visible[m.cursor]
-	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), helpStyle.Render("space complete | esc/q back"))
+	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\n%s\n",
+		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), emptyDash(task.Note), helpStyle.Render("space complete | esc/q back"))
 }
 
 func (m Model) createView() string {
