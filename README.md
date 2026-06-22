@@ -1,5 +1,7 @@
 # tuidledo
 
+[![Go](https://github.com/sgruendel/tuidledo/actions/workflows/go.yml/badge.svg)](https://github.com/sgruendel/tuidledo/actions/workflows/go.yml)
+
 Go TUI client for Toodledo, focused on a Master Your Now style task list.
 
 ## Status
