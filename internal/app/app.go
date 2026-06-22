@@ -169,7 +169,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if m.state == stateSearch {
 		switch key {
-		case "esc", "enter":
+		case "esc":
+			m.query = ""
+			m.state = stateTasks
+			m.refreshVisible()
+			return m, nil
+		case "enter":
 			m.state = stateTasks
 			m.refreshVisible()
 			return m, nil
