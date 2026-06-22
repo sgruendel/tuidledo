@@ -22,6 +22,7 @@ const (
 	stateTasks
 	stateDetails
 	stateSearch
+	stateCreate
 	stateHelp
 	stateError
 )
@@ -38,6 +39,11 @@ type completeMsg struct {
 	err    error
 }
 
+type createMsg struct {
+	task toodledo.Task
+	err  error
+}
+
 type Model struct {
 	cfg          config.Config
 	client       *toodledo.Client
@@ -51,6 +57,7 @@ type Model struct {
 	visible      []toodledo.Task
 	cursor       int
 	query        string
+	createTitle  string
 	width        int
 	height       int
 }
@@ -114,6 +121,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.message = "Completed task"
 		m.refreshVisible()
 		return m, nil
+	case createMsg:
+		if msg.err != nil {
+			m.state = stateError
+			m.err = msg.err
+			return m, nil
+		}
+		m.tasks = append(m.tasks, msg.task)
+		m.createTitle = ""
+		m.state = stateTasks
+		m.message = "Created task"
+		m.refreshVisible()
+		for i, task := range m.visible {
+			if task.ID == msg.task.ID {
+				m.cursor = i
+				break
+			}
+		}
+		return m, nil
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -133,6 +158,9 @@ func (m Model) View() string {
 	if m.state == stateDetails {
 		return m.detailView()
 	}
+	if m.state == stateCreate {
+		return m.createView()
+	}
 	return m.taskView()
 }
 
@@ -146,7 +174,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "backspace", "ctrl+h":
 			if len(m.query) > 0 {
-				m.query = m.query[:len(m.query)-1]
+				m.query = trimLastRune(m.query)
 				m.refreshVisible()
 			}
 			return m, nil
@@ -156,6 +184,35 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if len(key) == 1 {
 				m.query += key
 				m.refreshVisible()
+			}
+			return m, nil
+		}
+	}
+	if m.state == stateCreate {
+		switch key {
+		case "esc":
+			m.createTitle = ""
+			m.state = stateTasks
+			return m, nil
+		case "ctrl+c":
+			return m, tea.Quit
+		case "enter":
+			title := strings.TrimSpace(m.createTitle)
+			if title == "" {
+				m.message = "Task title cannot be empty"
+				m.state = stateTasks
+				return m, nil
+			}
+			m.message = "Creating task..."
+			return m, m.createCmd(title)
+		case "backspace", "ctrl+h":
+			if len(m.createTitle) > 0 {
+				m.createTitle = trimLastRune(m.createTitle)
+			}
+			return m, nil
+		default:
+			if len(key) == 1 {
+				m.createTitle += key
 			}
 			return m, nil
 		}
@@ -209,6 +266,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.prevContext()
 	case "/":
 		m.state = stateSearch
+	case "n":
+		m.createTitle = ""
+		m.state = stateCreate
 	case "enter":
 		if len(m.visible) > 0 {
 			m.state = stateDetails
@@ -280,6 +340,21 @@ func (m Model) completeCmd(taskID int64) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		return completeMsg{taskID: taskID, err: m.client.CompleteTask(ctx, taskID, time.Now())}
+	}
+}
+
+func (m Model) createCmd(title string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		task := toodledo.Task{
+			Title:     title,
+			Priority:  1,
+			StartDate: toodledo.NoonUnix(time.Now()),
+			Context:   m.currentContextID(),
+		}
+		created, err := m.client.AddTask(ctx, task)
+		return createMsg{task: created, err: err}
 	}
 }
 
@@ -376,6 +451,13 @@ func (m Model) contextName() string {
 	return "All"
 }
 
+func (m Model) currentContextID() int64 {
+	if m.contextIndex > 0 && m.contextIndex-1 < len(m.contexts) {
+		return m.contexts[m.contextIndex-1].ID
+	}
+	return 0
+}
+
 func (m Model) taskView() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("tuidledo"))
@@ -418,7 +500,7 @@ func (m Model) taskView() string {
 		b.WriteString(subtleStyle.Render(m.message))
 		b.WriteString("\n")
 	}
-	b.WriteString(helpStyle.Render("j/k move | tab/S-tab priority | [ ] context | / search | space complete | enter details | r refresh | ? help | q quit"))
+	b.WriteString(helpStyle.Render("j/k move | n new | tab/S-tab priority | [ ] context | / search | space complete | enter details | r refresh | ? help | q quit"))
 	b.WriteByte('\n')
 	return b.String()
 }
@@ -432,6 +514,11 @@ func (m Model) detailView() string {
 		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), emptyDash(task.Repeat), helpStyle.Render("space complete | esc/q back"))
 }
 
+func (m Model) createView() string {
+	return fmt.Sprintf("%s\n\nContext: %s\nPriority: Med\nStart: %s\n\nTask title:\n> %s\n\n%s\n",
+		titleStyle.Render("New Task"), m.contextName(), myn.DateLabel(toodledo.NoonUnix(time.Now())), m.createTitle, helpStyle.Render("enter create | esc cancel"))
+}
+
 func (m Model) helpView() string {
 	return titleStyle.Render("Help") + `
 
@@ -440,6 +527,7 @@ g/G               jump to top/bottom
 tab/shift+tab     jump between priority groups
 [ / ]             switch context
 /                 search visible task titles
+n                 create task in current context
 space             complete selected task
 enter             show task details
 r                 refresh from Toodledo
@@ -463,6 +551,14 @@ func emptyDash(value string) string {
 		return "-"
 	}
 	return value
+}
+
+func trimLastRune(value string) string {
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return value
+	}
+	return string(runes[:len(runes)-1])
 }
 
 var (

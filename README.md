@@ -10,6 +10,7 @@ Early scaffold. The first version supports:
 - MYN-style task filtering
 - Toodledo contexts for separate work/private task lists
 - Vim/lazygit-style navigation
+- Task creation with MYN defaults
 - Task completion
 
 ## Setup
@@ -45,6 +46,8 @@ The task list hides:
 
 Visible tasks are sorted by priority first, then start date descending within each priority group.
 
+New tasks use the current context, medium priority, and today's start date.
+
 ## Keybindings
 
 - `j` / `k` or arrows: move selection
@@ -52,6 +55,7 @@ Visible tasks are sorted by priority first, then start date descending within ea
 - `tab` / `shift+tab`: jump between priority groups
 - `[` / `]`: switch context
 - `/`: search visible task titles
+- `n`: create task in the current context
 - `space`: complete selected task
 - `enter`: show task details
 - `r`: refresh from Toodledo
