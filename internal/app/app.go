@@ -81,7 +81,7 @@ func New() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return m.startupCmd()
+	return tea.Batch(tea.EnableBracketedPaste, m.startupCmd())
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -181,8 +181,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		default:
-			if len(key) == 1 {
-				m.query += key
+			if msg.Type == tea.KeyRunes {
+				m.query += string(msg.Runes)
 				m.refreshVisible()
 			}
 			return m, nil
@@ -211,8 +211,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		default:
-			if len(key) == 1 {
-				m.createTitle += key
+			if msg.Type == tea.KeyRunes {
+				m.createTitle += string(msg.Runes)
 			}
 			return m, nil
 		}
