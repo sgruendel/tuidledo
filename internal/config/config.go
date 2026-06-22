@@ -11,11 +11,12 @@ import (
 const appDirName = "tuidledo"
 
 type Config struct {
-	ClientID     string    `json:"client_id"`
-	ClientSecret string    `json:"client_secret"`
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	TokenExpiry  time.Time `json:"token_expiry"`
+	ClientID      string    `json:"client_id"`
+	ClientSecret  string    `json:"client_secret"`
+	AccessToken   string    `json:"access_token"`
+	RefreshToken  string    `json:"refresh_token"`
+	TokenExpiry   time.Time `json:"token_expiry"`
+	LastContextID int64     `json:"last_context_id"`
 }
 
 func Load() (Config, error) {

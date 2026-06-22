@@ -102,6 +102,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg = msg.cfg
 			m.client = toodledo.NewClient(m.cfg.ClientID, m.cfg.ClientSecret, m.cfg.AccessToken)
 		}
+		m.restoreContext()
 		m.state = stateTasks
 		m.message = fmt.Sprintf("Synced %d tasks", len(msg.tasks))
 		m.refreshVisible()
@@ -179,7 +180,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "ctrl+c":
-			return m, tea.Quit
+			return m, m.quitCmd()
 		default:
 			if msg.Type == tea.KeyRunes {
 				m.query += string(msg.Runes)
@@ -195,7 +196,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.state = stateTasks
 			return m, nil
 		case "ctrl+c":
-			return m, tea.Quit
+			return m, m.quitCmd()
 		case "enter":
 			title := strings.TrimSpace(m.createTitle)
 			if title == "" {
@@ -220,10 +221,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "ctrl+c":
-		return m, tea.Quit
+		return m, m.quitCmd()
 	case "q":
 		if m.state == stateTasks || m.state == stateError {
-			return m, tea.Quit
+			return m, m.quitCmd()
 		}
 		m.state = stateTasks
 		return m, nil
@@ -358,6 +359,14 @@ func (m Model) createCmd(title string) tea.Cmd {
 	}
 }
 
+func (m Model) quitCmd() tea.Cmd {
+	m.cfg.LastContextID = m.currentContextID()
+	return tea.Sequence(func() tea.Msg {
+		_ = config.Save(m.cfg)
+		return nil
+	}, tea.Quit)
+}
+
 func fetchAll(ctx context.Context, client *toodledo.Client) ([]toodledo.Context, []toodledo.Task, error) {
 	contexts, err := client.GetContexts(ctx)
 	if err != nil {
@@ -400,6 +409,19 @@ func (m *Model) prevContext() {
 	}
 	m.cursor = 0
 	m.refreshVisible()
+}
+
+func (m *Model) restoreContext() {
+	m.contextIndex = 0
+	if m.cfg.LastContextID == 0 {
+		return
+	}
+	for i, contextItem := range m.contexts {
+		if contextItem.ID == m.cfg.LastContextID {
+			m.contextIndex = i + 1
+			return
+		}
+	}
 }
 
 func (m *Model) nextPriority() {

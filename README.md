@@ -34,7 +34,7 @@ Run the TUI:
 go run ./cmd/tuidledo
 ```
 
-On first launch, open the printed authorization URL and approve access. Tokens are stored in your user config directory as `tuidledo/config.json`.
+On first launch, open the printed authorization URL and approve access. Tokens and the last selected context are stored in your user config directory as `tuidledo/config.json`.
 
 ## MYN Filtering
 
