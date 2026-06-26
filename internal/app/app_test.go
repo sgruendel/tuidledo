@@ -86,6 +86,15 @@ func TestCreateInputAcceptsPastedRunesAndCancels(t *testing.T) {
 	}
 }
 
+func TestLinkURLs(t *testing.T) {
+	t.Setenv("TMUX", "")
+	got := linkURLs("See https://example.com/test.")
+	want := "See \x1b]8;;https://example.com/test\x1b\\https://example.com/test\x1b]8;;\x1b\\."
+	if got != want {
+		t.Fatalf("linkURLs() = %q, want %q", got, want)
+	}
+}
+
 func testModel() Model {
 	m := Model{
 		state: stateTasks,

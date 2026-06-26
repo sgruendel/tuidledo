@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -540,7 +541,7 @@ func (m Model) detailView() string {
 	}
 	task := m.visible[m.cursor]
 	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), emptyDash(task.Note), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), linkURLs(emptyDash(task.Note)), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
 }
 
 func (m Model) createView() string {
@@ -598,6 +599,20 @@ func trimLastRune(value string) string {
 	}
 	return string(runes[:len(runes)-1])
 }
+
+func linkURLs(value string) string {
+	return urlPattern.ReplaceAllStringFunc(value, func(match string) string {
+		trimmed := strings.TrimRight(match, ".,;:!?)]")
+		trailing := strings.TrimPrefix(match, trimmed)
+		return terminalLink(trimmed, trimmed) + trailing
+	})
+}
+
+func terminalLink(url, label string) string {
+	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
+}
+
+var urlPattern = regexp.MustCompile(`https?://[^\s<]+`)
 
 func taskRowStyle(row int) lipgloss.Style {
 	if row%2 == 1 {
