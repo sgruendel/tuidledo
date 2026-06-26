@@ -500,6 +500,7 @@ func (m Model) taskView() string {
 		b.WriteString("No visible MYN tasks.\n")
 	} else {
 		lastPriority := -2
+		row := 0
 		for i, task := range m.visible {
 			if task.Priority != lastPriority {
 				if i > 0 {
@@ -511,7 +512,7 @@ func (m Model) taskView() string {
 			}
 
 			cursor := "  "
-			style := lipgloss.NewStyle()
+			style := taskRowStyle(row)
 			if i == m.cursor {
 				cursor = "> "
 				style = selectedStyle
@@ -519,6 +520,7 @@ func (m Model) taskView() string {
 			line := fmt.Sprintf("%s%-10s  %-10s  %-18s %s", cursor, myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), task.Title)
 			b.WriteString(style.Render(line))
 			b.WriteByte('\n')
+			row++
 		}
 	}
 
@@ -597,11 +599,19 @@ func trimLastRune(value string) string {
 	return string(runes[:len(runes)-1])
 }
 
+func taskRowStyle(row int) lipgloss.Style {
+	if row%2 == 1 {
+		return zebraStyle
+	}
+	return lipgloss.NewStyle()
+}
+
 var (
 	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	subtleStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
 	helpStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	priorityHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111"))
+	zebraStyle          = lipgloss.NewStyle().Background(lipgloss.Color("235"))
 	selectedStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("238"))
 )
