@@ -77,6 +77,19 @@ func TestDateLabelAtUsesRelativeLabels(t *testing.T) {
 	}
 }
 
+func TestIsToday(t *testing.T) {
+	now := time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC)
+	if !IsToday(toodledo.NoonUnix(now), now) {
+		t.Fatal("IsToday() = false, want true")
+	}
+	if IsToday(toodledo.NoonUnix(now.AddDate(0, 0, -1)), now) {
+		t.Fatal("IsToday(yesterday) = true, want false")
+	}
+	if IsToday(0, now) {
+		t.Fatal("IsToday(0) = true, want false")
+	}
+}
+
 func taskIDs(tasks []toodledo.Task) []int64 {
 	ids := make([]int64, 0, len(tasks))
 	for _, task := range tasks {

@@ -518,8 +518,13 @@ func (m Model) taskView() string {
 				cursor = "> "
 				style = selectedStyle
 			}
-			line := fmt.Sprintf("%s%-46s  %-10s  %-10s  %-18s", cursor, task.Title, myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat))
-			b.WriteString(style.Render(line))
+			titleStyle := style
+			if myn.IsToday(task.StartDate, time.Now()) {
+				titleStyle = titleStyle.Underline(true)
+			}
+			b.WriteString(style.Render(cursor))
+			b.WriteString(titleStyle.Render(fmt.Sprintf("%-46s", task.Title)))
+			b.WriteString(style.Render(fmt.Sprintf("  %-10s  %-10s  %-18s", myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat))))
 			b.WriteByte('\n')
 			row++
 		}
