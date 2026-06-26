@@ -55,6 +55,28 @@ func TestVisibleTasksSortsByPriorityThenStartDateDescending(t *testing.T) {
 	}
 }
 
+func TestDateLabelAtUsesRelativeLabels(t *testing.T) {
+	now := time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		date time.Time
+		want string
+	}{
+		{name: "yesterday", date: now.AddDate(0, 0, -1), want: "yesterday"},
+		{name: "today", date: now, want: "today"},
+		{name: "tomorrow", date: now.AddDate(0, 0, 1), want: "tomorrow"},
+		{name: "other", date: now.AddDate(0, 0, 2), want: "2026-06-24"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := DateLabelAt(toodledo.NoonUnix(test.date), now); got != test.want {
+				t.Fatalf("DateLabelAt() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func taskIDs(tasks []toodledo.Task) []int64 {
 	ids := make([]int64, 0, len(tasks))
 	for _, task := range tasks {

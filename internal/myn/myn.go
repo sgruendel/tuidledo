@@ -65,8 +65,28 @@ func PriorityLabel(priority int) string {
 }
 
 func DateLabel(unix int64) string {
+	return DateLabelAt(unix, time.Now())
+}
+
+func DateLabelAt(unix int64, now time.Time) string {
 	if unix == 0 {
 		return "-"
 	}
-	return time.Unix(unix, 0).UTC().Format("2006-01-02")
+	date := dayStart(time.Unix(unix, 0).UTC())
+	today := dayStart(now.UTC())
+	switch date.Sub(today) {
+	case -24 * time.Hour:
+		return "yesterday"
+	case 0:
+		return "today"
+	case 24 * time.Hour:
+		return "tomorrow"
+	default:
+		return date.Format("2006-01-02")
+	}
+}
+
+func dayStart(t time.Time) time.Time {
+	y, m, d := t.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
