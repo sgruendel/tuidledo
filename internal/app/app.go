@@ -24,6 +24,7 @@ const (
 	stateDetails
 	stateSearch
 	stateCreate
+	stateConfirmDelete
 	stateHelp
 	stateError
 )
@@ -36,6 +37,11 @@ type syncMsg struct {
 }
 
 type completeMsg struct {
+	taskID int64
+	err    error
+}
+
+type deleteMsg struct {
 	taskID int64
 	err    error
 }
@@ -59,6 +65,7 @@ type Model struct {
 	cursor       int
 	query        string
 	createTitle  string
+	deleteTaskID int64
 	width        int
 	height       int
 }
@@ -114,13 +121,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		for i := range m.tasks {
-			if m.tasks[i].ID == msg.taskID {
-				m.tasks = append(m.tasks[:i], m.tasks[i+1:]...)
-				break
-			}
-		}
+		m.removeTask(msg.taskID)
 		m.message = "Completed task"
+		m.refreshVisible()
+		return m, nil
+	case deleteMsg:
+		if msg.err != nil {
+			m.state = stateError
+			m.err = msg.err
+			return m, nil
+		}
+		m.removeTask(msg.taskID)
+		m.message = "Deleted task"
 		m.refreshVisible()
 		return m, nil
 	case createMsg:
@@ -162,6 +174,9 @@ func (m Model) View() string {
 	}
 	if m.state == stateCreate {
 		return m.createView()
+	}
+	if m.state == stateConfirmDelete {
+		return m.confirmDeleteView()
 	}
 	return m.taskView()
 }
@@ -224,6 +239,28 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
+	if m.state == stateConfirmDelete {
+		switch key {
+		case "y", "Y":
+			if m.deleteTaskID == 0 {
+				m.state = stateTasks
+				return m, nil
+			}
+			taskID := m.deleteTaskID
+			m.deleteTaskID = 0
+			m.state = stateTasks
+			m.message = "Deleting task..."
+			return m, m.deleteCmd(taskID)
+		case "n", "N", "esc", "q":
+			m.deleteTaskID = 0
+			m.state = stateTasks
+			m.message = "Delete cancelled"
+			return m, nil
+		case "ctrl+c":
+			return m, m.quitCmd()
+		}
+		return m, nil
+	}
 
 	switch key {
 	case "ctrl+c":
@@ -280,11 +317,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.visible) > 0 {
 			m.state = stateDetails
 		}
-	case " ":
+	case "d":
 		if len(m.visible) > 0 {
 			task := m.visible[m.cursor]
 			m.message = "Completing task..."
 			return m, m.completeCmd(task.ID)
+		}
+	case "D":
+		if len(m.visible) > 0 {
+			task := m.visible[m.cursor]
+			m.deleteTaskID = task.ID
+			m.state = stateConfirmDelete
 		}
 	}
 	return m, nil
@@ -350,6 +393,14 @@ func (m Model) completeCmd(taskID int64) tea.Cmd {
 	}
 }
 
+func (m Model) deleteCmd(taskID int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		return deleteMsg{taskID: taskID, err: m.client.DeleteTask(ctx, taskID)}
+	}
+}
+
 func (m Model) createCmd(title string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -396,6 +447,15 @@ func (m *Model) refreshVisible() {
 	}
 	if m.cursor < 0 {
 		m.cursor = 0
+	}
+}
+
+func (m *Model) removeTask(taskID int64) {
+	for i := range m.tasks {
+		if m.tasks[i].ID == taskID {
+			m.tasks = append(m.tasks[:i], m.tasks[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -535,7 +595,7 @@ func (m Model) taskView() string {
 		b.WriteString(subtleStyle.Render(m.message))
 		b.WriteString("\n")
 	}
-	b.WriteString(helpStyle.Render("j/k move | n new | tab/S-tab priority | [ ] context | / search | space complete | enter details | r refresh | ? help | q quit"))
+	b.WriteString(helpStyle.Render("j/k move | n new | d done | D delete | tab/S-tab priority | [ ] context | / search | enter details | r refresh | ? help | q quit"))
 	b.WriteByte('\n')
 	return b.String()
 }
@@ -546,12 +606,31 @@ func (m Model) detailView() string {
 	}
 	task := m.visible[m.cursor]
 	return fmt.Sprintf("%s\n\n%s\n\nPriority: %s\nContext: %s\nStart: %s\nDue: %s\nRepeat: %s\n\nNote:\n%s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), linkURLs(emptyDash(task.Note)), attachmentList(task.Attachment), helpStyle.Render("space complete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, myn.PriorityLabel(task.Priority), m.contextName(), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), linkURLs(emptyDash(task.Note)), attachmentList(task.Attachment), helpStyle.Render("d complete | D delete | esc/q back"))
 }
 
 func (m Model) createView() string {
 	return fmt.Sprintf("%s\n\nContext: %s\nPriority: Med\nStart: %s\n\nTask title:\n> %s\n\n%s\n",
 		titleStyle.Render("New Task"), m.contextName(), myn.DateLabel(toodledo.NoonUnix(time.Now())), m.createTitle, helpStyle.Render("enter create | esc cancel"))
+}
+
+func (m Model) confirmDeleteView() string {
+	task := m.taskByID(m.deleteTaskID)
+	title := "selected task"
+	if task != nil {
+		title = task.Title
+	}
+	return fmt.Sprintf("%s\n\nDelete this task permanently?\n\n%s\n\n%s\n",
+		errorStyle.Render("Confirm Delete"), title, helpStyle.Render("y delete | n/esc cancel"))
+}
+
+func (m Model) taskByID(taskID int64) *toodledo.Task {
+	for i := range m.tasks {
+		if m.tasks[i].ID == taskID {
+			return &m.tasks[i]
+		}
+	}
+	return nil
 }
 
 func (m Model) helpView() string {
@@ -563,7 +642,8 @@ tab/shift+tab     jump between priority groups
 [ / ]             switch context
 /                 search visible task titles
 n                 create task in current context
-space             complete selected task
+d                 complete selected task
+D                 ask to delete selected task
 enter             show task details
 r                 refresh from Toodledo
 esc               back or clear search

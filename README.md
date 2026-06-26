@@ -58,10 +58,22 @@ New tasks use the current context, medium priority, and today's start date.
 - `[` / `]`: switch context
 - `/`: search visible task titles
 - `n`: create task in the current context
-- `space`: complete selected task
+- `d`: complete selected task
+- `D`: ask to delete selected task
 - `enter`: show task details
 - `r`: refresh from Toodledo
 - `esc`: back or clear search
 - `?`: help
 - `q`: back, or quit from the task list
 - `ctrl+c`: quit
+
+## tmux Hyperlinks
+
+Task notes use terminal hyperlinks for URLs. If links work directly in your terminal but not inside tmux, enable passthrough in `~/.tmux.conf`:
+
+```tmux
+set -g allow-passthrough on
+set -as terminal-features ',*:hyperlinks'
+```
+
+Restart tmux or reload the config after changing it.

@@ -146,6 +146,27 @@ func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt tim
 	return nil
 }
 
+func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
+	payload, err := json.Marshal([]int64{taskID})
+	if err != nil {
+		return err
+	}
+	params := url.Values{}
+	params.Set("tasks", string(payload))
+
+	var raw []json.RawMessage
+	if err := c.post(ctx, "/tasks/delete.php", params, &raw); err != nil {
+		return err
+	}
+	for _, item := range raw {
+		var apiErr APIError
+		if json.Unmarshal(item, &apiErr) == nil && apiErr.ErrorCode != 0 {
+			return fmt.Errorf("delete task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+		}
+	}
+	return nil
+}
+
 func (c *Client) token(ctx context.Context, params url.Values) (Token, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/account/token.php", strings.NewReader(params.Encode()))
 	if err != nil {

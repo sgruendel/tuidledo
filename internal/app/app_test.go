@@ -86,6 +86,78 @@ func TestCreateInputAcceptsPastedRunesAndCancels(t *testing.T) {
 	}
 }
 
+func TestCompleteMsgRemovesTask(t *testing.T) {
+	m := testModel()
+
+	model, _ := m.Update(completeMsg{taskID: 1})
+	updated := model.(Model)
+	if len(updated.tasks) != 2 || updated.tasks[0].ID == 1 {
+		t.Fatalf("tasks after complete = %#v", updated.tasks)
+	}
+	if updated.message != "Completed task" {
+		t.Fatalf("message = %q, want Completed task", updated.message)
+	}
+}
+
+func TestDeleteMsgRemovesTask(t *testing.T) {
+	m := testModel()
+
+	model, _ := m.Update(deleteMsg{taskID: 1})
+	updated := model.(Model)
+	if len(updated.tasks) != 2 || updated.tasks[0].ID == 1 {
+		t.Fatalf("tasks after delete = %#v", updated.tasks)
+	}
+	if updated.message != "Deleted task" {
+		t.Fatalf("message = %q, want Deleted task", updated.message)
+	}
+}
+
+func TestDeleteKeyOpensConfirmation(t *testing.T) {
+	m := testModel()
+
+	m = updateKey(t, m, "D")
+	if m.state != stateConfirmDelete {
+		t.Fatalf("state after D = %v, want stateConfirmDelete", m.state)
+	}
+	if m.deleteTaskID != 1 {
+		t.Fatalf("deleteTaskID = %d, want 1", m.deleteTaskID)
+	}
+}
+
+func TestDeleteConfirmationCancel(t *testing.T) {
+	m := testModel()
+	m = updateKey(t, m, "D")
+	m = updateKey(t, m, "n")
+
+	if m.state != stateTasks {
+		t.Fatalf("state after n = %v, want stateTasks", m.state)
+	}
+	if m.deleteTaskID != 0 {
+		t.Fatalf("deleteTaskID = %d, want 0", m.deleteTaskID)
+	}
+	if len(m.tasks) != 3 {
+		t.Fatalf("tasks after cancel = %d, want 3", len(m.tasks))
+	}
+}
+
+func TestDeleteConfirmationConfirmReturnsCommand(t *testing.T) {
+	m := testModel()
+	m = updateKey(t, m, "D")
+
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	model, cmd := m.Update(msg)
+	updated := model.(Model)
+	if updated.state != stateTasks {
+		t.Fatalf("state after y = %v, want stateTasks", updated.state)
+	}
+	if updated.deleteTaskID != 0 {
+		t.Fatalf("deleteTaskID = %d, want 0", updated.deleteTaskID)
+	}
+	if cmd == nil {
+		t.Fatal("cmd after y = nil, want delete command")
+	}
+}
+
 func TestLinkURLs(t *testing.T) {
 	t.Setenv("TMUX", "")
 	got := linkURLs("See https://example.com/test.")
@@ -138,7 +210,7 @@ func updateRunes(t *testing.T, m Model, value string) Model {
 
 func keyTypeForString(key string) tea.KeyType {
 	switch key {
-	case "j", "k", "g", "G", "[", "]", "/", "n":
+	case "j", "k", "g", "G", "[", "]", "/", "n", "D", "y":
 		return tea.KeyRunes
 	case "tab":
 		return tea.KeyTab
