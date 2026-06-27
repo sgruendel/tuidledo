@@ -9,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	datepicker "github.com/ethanefung/bubble-datepicker"
 
 	"github.com/sgruendel/tuidledo/internal/config"
 	"github.com/sgruendel/tuidledo/internal/myn"
@@ -25,6 +28,7 @@ const (
 	stateDetails
 	stateSearch
 	stateCreate
+	stateEditTask
 	stateConfirmDelete
 	stateHelp
 	stateError
@@ -55,6 +59,24 @@ type createMsg struct {
 	err  error
 }
 
+type editMsg struct {
+	task toodledo.Task
+	cfg  config.Config
+	err  error
+}
+
+type editField int
+
+const (
+	editFieldTitle editField = iota
+	editFieldNote
+	editFieldPriority
+	editFieldStart
+	editFieldDue
+	editFieldContext
+	editFieldCount
+)
+
 type Model struct {
 	cfg          config.Config
 	client       *toodledo.Client
@@ -69,6 +91,14 @@ type Model struct {
 	cursor       int
 	query        string
 	createTitle  string
+	editTaskID   int64
+	editField    editField
+	titleInput   textinput.Model
+	noteInput    textarea.Model
+	editPriority int
+	startPicker  datepicker.Model
+	duePicker    datepicker.Model
+	editContext  int64
 	deleteTaskID int64
 	width        int
 	height       int
@@ -160,6 +190,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case editMsg:
+		if msg.err != nil {
+			m.state = stateError
+			m.err = msg.err
+			return m, nil
+		}
+		m.applyConfig(msg.cfg)
+		m.updateTask(msg.task)
+		m.state = stateDetails
+		m.message = "Updated task"
+		m.clearEditForm()
+		m.refreshVisible()
+		for i, task := range m.visible {
+			if task.ID == msg.task.ID {
+				m.cursor = i
+				break
+			}
+		}
+		return m, nil
 	case tea.PasteMsg:
 		return m.handlePaste(msg)
 	case tea.KeyPressMsg:
@@ -188,6 +237,9 @@ func (m Model) viewString() string {
 	if m.state == stateCreate {
 		return m.createView()
 	}
+	if m.state == stateEditTask {
+		return m.editView()
+	}
 	if m.state == stateConfirmDelete {
 		return m.confirmDeleteView()
 	}
@@ -203,6 +255,9 @@ func (m Model) handlePaste(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
 	if m.state == stateCreate {
 		m.createTitle += msg.Content
 		return m, nil
+	}
+	if m.state == stateEditTask {
+		return m.updateFocusedEditInput(msg)
 	}
 	return m, nil
 }
@@ -264,6 +319,66 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
+	}
+	if m.state == stateEditTask {
+		switch key {
+		case "esc":
+			m.clearEditForm()
+			m.state = stateDetails
+			return m, nil
+		case "ctrl+c":
+			return m, m.quitCmd()
+		case "tab":
+			m.focusEditField((m.editField + 1) % editFieldCount)
+			return m, nil
+		case "shift+tab":
+			m.focusEditField((m.editField + editFieldCount - 1) % editFieldCount)
+			return m, nil
+		case "enter":
+			if m.editField == editFieldPriority {
+				m.nextEditPriority()
+				return m, nil
+			}
+			if m.editField == editFieldStart || m.editField == editFieldDue {
+				m.selectFocusedDate()
+				return m, nil
+			}
+			if m.editField == editFieldContext {
+				m.nextEditContext()
+				return m, nil
+			}
+		case "[":
+			if m.editField == editFieldPriority {
+				m.prevEditPriority()
+				return m, nil
+			}
+			if m.editField == editFieldContext {
+				m.prevEditContext()
+				return m, nil
+			}
+		case "]":
+			if m.editField == editFieldPriority {
+				m.nextEditPriority()
+				return m, nil
+			}
+			if m.editField == editFieldContext {
+				m.nextEditContext()
+				return m, nil
+			}
+		case "ctrl+s":
+			if _, err := m.editedTask(time.Now()); err != nil {
+				m.message = err.Error()
+				return m, nil
+			}
+			m.message = "Updating task..."
+			return m, m.editCmd()
+		case "h", "left", "l", "right", "j", "down", "k", "up", "H", "L", "x":
+			if m.editField == editFieldStart || m.editField == editFieldDue {
+				m.updateFocusedDatePicker(key)
+				return m, nil
+			}
+		}
+		return m.updateFocusedEditInput(msg)
 	}
 	if m.state == stateConfirmDelete {
 		switch key {
@@ -342,6 +457,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(m.visible) > 0 {
 			m.state = stateDetails
+		}
+	case "e":
+		if m.state == stateDetails && len(m.visible) > 0 {
+			m.startEditForm(m.visible[m.cursor])
+			return m, m.titleInput.Focus()
 		}
 	case "d":
 		if len(m.visible) > 0 {
@@ -453,6 +573,48 @@ func (m Model) createCmd(title string) tea.Cmd {
 	}
 }
 
+func (m Model) editCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		task, err := m.editedTask(time.Now())
+		if err != nil {
+			return editMsg{err: err}
+		}
+
+		var edited toodledo.Task
+		cfg, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
+			var err error
+			edited, err = client.EditTask(ctx, task)
+			return err
+		})
+		return editMsg{task: edited, cfg: cfg, err: err}
+	}
+}
+
+func (m Model) editedTask(now time.Time) (toodledo.Task, error) {
+	current := m.taskByID(m.editTaskID)
+	if current == nil {
+		return toodledo.Task{}, fmt.Errorf("task %d not found", m.editTaskID)
+	}
+	title := strings.TrimSpace(m.titleInput.Value())
+	if title == "" {
+		return toodledo.Task{}, fmt.Errorf("task title cannot be empty")
+	}
+	startDate := datePickerUnix(m.startPicker)
+	dueDate := datePickerUnix(m.duePicker)
+
+	task := *current
+	task.Title = title
+	task.Note = m.noteInput.Value()
+	task.Priority = m.editPriority
+	task.StartDate = startDate
+	task.DueDate = dueDate
+	task.Context = m.editContext
+	return task, nil
+}
+
 func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Client) error) (config.Config, *toodledo.Client, error) {
 	cfg := m.cfg
 	client := toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
@@ -554,6 +716,152 @@ func (m *Model) removeTask(taskID int64) {
 	}
 }
 
+func (m *Model) updateTask(updated toodledo.Task) {
+	for i := range m.tasks {
+		if m.tasks[i].ID == updated.ID {
+			m.tasks[i] = updated
+			return
+		}
+	}
+	m.tasks = append(m.tasks, updated)
+}
+
+func (m *Model) startEditForm(task toodledo.Task) {
+	m.editTaskID = task.ID
+	m.editContext = task.Context
+	m.editPriority = task.Priority
+	m.titleInput = newTitleInput(task.Title, m.width)
+	m.noteInput = newNoteInput(task.Note, m.width)
+	m.startPicker = newDatePicker(task.StartDate)
+	m.duePicker = newDatePicker(task.DueDate)
+	m.state = stateEditTask
+	m.focusEditField(editFieldTitle)
+}
+
+func (m *Model) clearEditForm() {
+	m.editTaskID = 0
+	m.editField = editFieldTitle
+	m.editContext = 0
+	m.editPriority = 0
+	m.titleInput = textinput.Model{}
+	m.noteInput = textarea.Model{}
+	m.startPicker = datepicker.Model{}
+	m.duePicker = datepicker.Model{}
+}
+
+func (m *Model) focusEditField(field editField) {
+	m.editField = field
+	m.titleInput.Blur()
+	m.noteInput.Blur()
+	m.startPicker.Blur()
+	m.duePicker.Blur()
+	switch field {
+	case editFieldTitle:
+		m.titleInput.Focus()
+	case editFieldNote:
+		m.noteInput.Focus()
+	case editFieldStart:
+		m.startPicker.SetFocus(datepicker.FocusCalendar)
+	case editFieldDue:
+		m.duePicker.SetFocus(datepicker.FocusCalendar)
+	}
+}
+
+func (m Model) updateFocusedEditInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch m.editField {
+	case editFieldTitle:
+		m.titleInput, cmd = m.titleInput.Update(msg)
+	case editFieldNote:
+		m.noteInput, cmd = m.noteInput.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m *Model) nextEditContext() {
+	ids := m.contextIDsForEdit()
+	for i, id := range ids {
+		if id == m.editContext {
+			m.editContext = ids[(i+1)%len(ids)]
+			return
+		}
+	}
+	m.editContext = ids[0]
+}
+
+func (m *Model) prevEditContext() {
+	ids := m.contextIDsForEdit()
+	for i, id := range ids {
+		if id == m.editContext {
+			m.editContext = ids[(i+len(ids)-1)%len(ids)]
+			return
+		}
+	}
+	m.editContext = ids[0]
+}
+
+func (m *Model) nextEditPriority() {
+	m.editPriority++
+	if m.editPriority > 3 {
+		m.editPriority = 0
+	}
+}
+
+func (m *Model) prevEditPriority() {
+	m.editPriority--
+	if m.editPriority < 0 {
+		m.editPriority = 3
+	}
+}
+
+func (m *Model) selectFocusedDate() {
+	if m.editField == editFieldStart {
+		m.startPicker.SelectDate()
+		return
+	}
+	if m.editField == editFieldDue {
+		m.duePicker.SelectDate()
+	}
+}
+
+func (m *Model) updateFocusedDatePicker(key string) {
+	picker := &m.startPicker
+	if m.editField == editFieldDue {
+		picker = &m.duePicker
+	}
+	switch key {
+	case "h", "left":
+		picker.Yesterday()
+		picker.SelectDate()
+	case "l", "right":
+		picker.Tomorrow()
+		picker.SelectDate()
+	case "j", "down":
+		picker.NextWeek()
+		picker.SelectDate()
+	case "k", "up":
+		picker.LastWeek()
+		picker.SelectDate()
+	case "H":
+		picker.LastMonth()
+		picker.SelectDate()
+	case "L":
+		picker.NextMonth()
+		picker.SelectDate()
+	case "x":
+		picker.UnselectDate()
+	}
+}
+
+func (m Model) contextIDsForEdit() []int64 {
+	ids := make([]int64, 0, len(m.contexts)+1)
+	ids = append(ids, 0)
+	for _, contextItem := range m.contexts {
+		ids = append(ids, contextItem.ID)
+	}
+	return ids
+}
+
 func (m *Model) nextContext() {
 	m.contextIndex++
 	if m.contextIndex > len(m.contexts) {
@@ -634,6 +942,18 @@ func (m Model) contextName() string {
 	return "All"
 }
 
+func (m Model) contextNameByID(contextID int64) string {
+	if contextID == 0 {
+		return "None"
+	}
+	for _, contextItem := range m.contexts {
+		if contextItem.ID == contextID {
+			return contextItem.Name
+		}
+	}
+	return "Unknown"
+}
+
 func (m Model) currentContextID() int64 {
 	if m.contextIndex > 0 && m.contextIndex-1 < len(m.contexts) {
 		return m.contexts[m.contextIndex-1].ID
@@ -701,7 +1021,41 @@ func (m Model) detailView() string {
 	}
 	task := m.visible[m.cursor]
 	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nPriority: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), myn.PriorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextName(), attachmentList(task.Attachment), helpStyle.Render("d complete | D delete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), myn.PriorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
+}
+
+func (m Model) editView() string {
+	priorityMarker := " "
+	if m.editField == editFieldPriority {
+		priorityMarker = ">"
+	}
+	contextMarker := " "
+	if m.editField == editFieldContext {
+		contextMarker = ">"
+	}
+	return fmt.Sprintf("%s\n\nTitle\n%s\n\nNote\n%s\n\nPriority\n%s %s\n\nStart\n%s\n\nDue\n%s\n\nContext\n%s %s\n\n%s\n",
+		titleStyle.Render("Edit Task"),
+		m.titleInput.View(),
+		m.noteInput.View(),
+		priorityMarker,
+		myn.PriorityLabel(m.editPriority),
+		m.dateFieldView(editFieldStart, m.startPicker),
+		m.dateFieldView(editFieldDue, m.duePicker),
+		contextMarker,
+		m.contextNameByID(m.editContext),
+		helpStyle.Render("tab next field | shift+tab previous | ctrl+s save | esc cancel | dates: h/j/k/l move, H/L month, enter select, x clear"))
+}
+
+func (m Model) dateFieldView(field editField, picker datepicker.Model) string {
+	marker := " "
+	if m.editField == field {
+		marker = ">"
+	}
+	label := selectedDateText(picker)
+	if m.editField != field {
+		return fmt.Sprintf("%s %s", marker, label)
+	}
+	return fmt.Sprintf("%s %s\n%s", marker, label, picker.View())
 }
 
 func (m Model) createView() string {
@@ -739,11 +1093,16 @@ tab/shift+tab     jump between priority groups
 n                 create new task in current context
 d                 mark selected task done
 D                 ask to delete selected task
+e                 edit task from details
 enter             show task details
 r                 refresh from Toodledo
 esc               back or clear search
 q                 back, or quit from task list
 ctrl+c            quit
+
+Edit form: tab/shift+tab switches fields, ctrl+s saves, esc cancels.
+Priority and context fields cycle with [ ], or enter.
+Date fields use h/j/k/l, H/L for months, enter to select, x to clear.
 
 Register redirect URI: http://127.0.0.1:8765/callback
 ` + "\n"
@@ -778,6 +1137,53 @@ func trimLastRune(value string) string {
 		return value
 	}
 	return string(runes[:len(runes)-1])
+}
+
+func newTitleInput(value string, width int) textinput.Model {
+	input := textinput.New()
+	input.Placeholder = "Task title"
+	input.CharLimit = 255
+	input.SetWidth(max(40, min(100, width-4)))
+	input.SetValue(value)
+	input.CursorEnd()
+	return input
+}
+
+func newNoteInput(value string, width int) textarea.Model {
+	input := textarea.New()
+	input.Placeholder = "Task note"
+	input.ShowLineNumbers = false
+	input.SetWidth(max(40, min(100, width-4)))
+	input.SetHeight(10)
+	input.SetValue(value)
+	return input
+}
+
+func newDatePicker(unix int64) datepicker.Model {
+	date := time.Now()
+	if unix != 0 {
+		date = time.Unix(unix, 0).UTC()
+	}
+	picker := datepicker.New(date)
+	picker.SetFocus(datepicker.FocusCalendar)
+	if unix != 0 {
+		picker.SelectDate()
+	}
+	return picker
+}
+
+func datePickerUnix(picker datepicker.Model) int64 {
+	if !picker.Selected {
+		return 0
+	}
+	return toodledo.NoonUnix(picker.Time)
+}
+
+func selectedDateText(picker datepicker.Model) string {
+	if !picker.Selected {
+		return "(unset)"
+	}
+	return myn.DateLabel(datePickerUnix(picker))
 }
 
 func linkURLs(value string) string {

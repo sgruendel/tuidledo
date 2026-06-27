@@ -64,12 +64,15 @@ New tasks use the current context, medium priority, and today's start date.
 - `n`: create new task in the current context
 - `d`: mark selected task done
 - `D`: ask to delete selected task
+- `e`: edit task from task details
 - `enter`: show task details
 - `r`: refresh from Toodledo
 - `esc`: back or clear search
 - `?`: help
 - `q`: back, or quit from the task list
 - `ctrl+c`: quit
+
+In the edit form, `tab` / `shift+tab` switches between fields, `ctrl+s` saves, and `esc` cancels. Priority and context fields cycle with `[` / `]` or `enter`. Date fields use `h` / `j` / `k` / `l`, `H` / `L` for months, `enter` to select, and `x` to clear.
 
 ## tmux Hyperlinks
 

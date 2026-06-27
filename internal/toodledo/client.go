@@ -131,6 +131,41 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	return added, nil
 }
 
+func (c *Client) EditTask(ctx context.Context, task Task) (Task, error) {
+	payload, err := json.Marshal([]map[string]any{{
+		"id":        task.ID,
+		"title":     task.Title,
+		"note":      task.Note,
+		"priority":  task.Priority,
+		"startdate": task.StartDate,
+		"duedate":   task.DueDate,
+		"context":   task.Context,
+	}})
+	if err != nil {
+		return Task{}, err
+	}
+	params := url.Values{}
+	params.Set("tasks", string(payload))
+	params.Set("fields", taskFields)
+
+	var raw []json.RawMessage
+	if err := c.post(ctx, "/tasks/edit.php", params, &raw); err != nil {
+		return Task{}, err
+	}
+	if len(raw) == 0 {
+		return Task{}, fmt.Errorf("edit task: empty response")
+	}
+	var apiErr APIError
+	if json.Unmarshal(raw[0], &apiErr) == nil && apiErr.ErrorCode != 0 {
+		return Task{}, fmt.Errorf("edit task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+	}
+	var edited Task
+	if err := json.Unmarshal(raw[0], &edited); err != nil {
+		return Task{}, err
+	}
+	return edited, nil
+}
+
 func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt time.Time) error {
 	payload, err := json.Marshal([]map[string]any{{"id": taskID, "completed": NoonUnix(completedAt)}})
 	if err != nil {
