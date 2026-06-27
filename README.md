@@ -23,6 +23,10 @@ repeat editing, file attachment management, or non-MYN list modes.
 
 ## Setup
 
+Prebuilt release binaries can embed the shared Toodledo OAuth client credentials.
+Locally, `config.json` stores only access tokens, refresh tokens, token expiry, and
+the last selected context.
+
 Register an app with Toodledo and configure this redirect URI:
 
 ```text
@@ -42,6 +46,10 @@ Run the TUI:
 go run ./cmd/tuidledo
 ```
 
+If you are running an official release binary, you do not need to set
+`TOODLEDO_CLIENT_ID` or `TOODLEDO_CLIENT_SECRET` because those values are embedded
+at build time by GitHub Actions.
+
 Print the version:
 
 ```sh
@@ -53,6 +61,34 @@ Release builds can stamp the version with:
 ```sh
 go build -ldflags "-X main.version=0.1.0" ./cmd/tuidledo
 ```
+
+To build a distributable binary with embedded Toodledo credentials yourself:
+
+```sh
+go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X main.clientSecret=$TOODLEDO_CLIENT_SECRET" ./cmd/tuidledo
+```
+
+## Releases
+
+The GitHub Actions workflow does two things:
+
+- runs formatting, tests, and a normal build on pushes and pull requests
+- builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64, and macOS arm64 on tags like `v0.1.0`
+
+To enable release builds, add these repository secrets:
+
+- `TOODLEDO_CLIENT_ID`
+- `TOODLEDO_CLIENT_SECRET`
+
+Then create and push a version tag:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+That tag run uploads workflow artifacts and publishes the packaged binaries as
+GitHub release assets.
 
 On first launch, open the printed authorization URL and approve access. Tokens
 and the last selected context are stored in your user config directory as

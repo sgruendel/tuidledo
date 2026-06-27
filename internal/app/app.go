@@ -83,6 +83,8 @@ type listRow struct {
 }
 
 type Model struct {
+	clientID            string
+	clientSecret        string
 	cfg                 config.Config
 	client              *toodledo.Client
 	state               state
@@ -112,13 +114,13 @@ type Model struct {
 	height              int
 }
 
-func New() Model {
+func New(clientID, clientSecret string) Model {
 	cfg, err := config.Load()
-	if cfg.ClientID == "" {
-		cfg.ClientID = os.Getenv("TOODLEDO_CLIENT_ID")
+	if clientID == "" {
+		clientID = os.Getenv("TOODLEDO_CLIENT_ID")
 	}
-	if cfg.ClientSecret == "" {
-		cfg.ClientSecret = os.Getenv("TOODLEDO_CLIENT_SECRET")
+	if clientSecret == "" {
+		clientSecret = os.Getenv("TOODLEDO_CLIENT_SECRET")
 	}
 	m := Model{cfg: cfg, state: stateLoading, message: "Starting tuidledo...\n\nIf authorization is needed, open the URL printed below and return here after approving access."}
 	if err != nil {
@@ -126,7 +128,9 @@ func New() Model {
 		m.err = err
 		return m
 	}
-	m.client = toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
+	m.clientID = clientID
+	m.clientSecret = clientSecret
+	m.client = toodledo.NewClient(clientID, clientSecret, cfg.AccessToken)
 	return m
 }
 
@@ -150,7 +154,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.tasks
 		if msg.cfg.AccessToken != "" {
 			m.cfg = msg.cfg
-			m.client = toodledo.NewClient(m.cfg.ClientID, m.cfg.ClientSecret, m.cfg.AccessToken)
+			m.client = toodledo.NewClient(m.clientID, m.clientSecret, m.cfg.AccessToken)
 		}
 		m.restoreContext()
 		m.state = stateTasks
@@ -501,20 +505,20 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) startupCmd() tea.Cmd {
 	return func() tea.Msg {
-		if m.cfg.ClientID == "" || m.cfg.ClientSecret == "" {
+		if m.clientID == "" || m.clientSecret == "" {
 			return syncMsg{err: fmt.Errorf("set TOODLEDO_CLIENT_ID and TOODLEDO_CLIENT_SECRET, then register redirect URI http://127.0.0.1:8765/callback")}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
 
-		client := toodledo.NewClient(m.cfg.ClientID, m.cfg.ClientSecret, m.cfg.AccessToken)
+		client := toodledo.NewClient(m.clientID, m.clientSecret, m.cfg.AccessToken)
 		cfg := m.cfg
 		cfg, client, err := refreshTokenIfNeeded(ctx, cfg, client)
 		if err != nil {
 			return syncMsg{err: err}
 		}
 		if cfg.AccessToken == "" || time.Now().After(cfg.TokenExpiry) {
-			result, err := toodledo.WaitForAuthCode(ctx, cfg.ClientID)
+			result, err := toodledo.WaitForAuthCode(ctx, m.clientID)
 			if err != nil {
 				return syncMsg{err: err}
 			}
@@ -637,7 +641,7 @@ func (m Model) editedTask(now time.Time) (toodledo.Task, error) {
 
 func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Client) error) (config.Config, *toodledo.Client, error) {
 	cfg := m.cfg
-	client := toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
+	client := toodledo.NewClient(m.clientID, m.clientSecret, cfg.AccessToken)
 	var err error
 	cfg, client, err = refreshTokenIfNeeded(ctx, cfg, client)
 	if err != nil {
@@ -690,7 +694,7 @@ func (m *Model) applyConfig(cfg config.Config) {
 		return
 	}
 	m.cfg = cfg
-	m.client = toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
+	m.client = toodledo.NewClient(m.clientID, m.clientSecret, cfg.AccessToken)
 }
 
 func (m Model) quitCmd() tea.Cmd {

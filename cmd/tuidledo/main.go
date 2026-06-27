@@ -10,6 +10,8 @@ import (
 )
 
 var version = "dev"
+var clientID = ""
+var clientSecret = ""
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
@@ -17,7 +19,7 @@ func main() {
 		return
 	}
 
-	program := tea.NewProgram(app.New())
+	program := tea.NewProgram(app.New(clientID, clientSecret))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "tuidledo: %v\n", err)
 		os.Exit(1)
