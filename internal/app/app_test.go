@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/sgruendel/tuidledo/internal/toodledo"
 )
@@ -144,7 +144,7 @@ func TestDeleteConfirmationConfirmReturnsCommand(t *testing.T) {
 	m := testModel()
 	m = updateKey(t, m, "D")
 
-	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")}
+	msg := keyPress("y")
 	model, cmd := m.Update(msg)
 	updated := model.(Model)
 	if updated.state != stateTasks {
@@ -186,11 +186,7 @@ func testModel() Model {
 
 func updateKey(t *testing.T, m Model, key string) Model {
 	t.Helper()
-	msg := tea.KeyMsg{Type: keyTypeForString(key), Runes: runesForString(key)}
-	if key == "shift+tab" {
-		msg.Type = tea.KeyShiftTab
-	}
-	model, _ := m.Update(msg)
+	model, _ := m.Update(keyPress(key))
 	updatedModel, ok := model.(Model)
 	if !ok {
 		t.Fatalf("updated model type = %T, want app.Model", model)
@@ -200,7 +196,7 @@ func updateKey(t *testing.T, m Model, key string) Model {
 
 func updateRunes(t *testing.T, m Model, value string) Model {
 	t.Helper()
-	model, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(value)})
+	model, _ := m.Update(tea.PasteMsg{Content: value})
 	updatedModel, ok := model.(Model)
 	if !ok {
 		t.Fatalf("updated model type = %T, want app.Model", model)
@@ -208,24 +204,25 @@ func updateRunes(t *testing.T, m Model, value string) Model {
 	return updatedModel
 }
 
-func keyTypeForString(key string) tea.KeyType {
+func keyPress(key string) tea.KeyPressMsg {
 	switch key {
-	case "j", "k", "g", "G", "[", "]", "/", "n", "D", "y":
-		return tea.KeyRunes
 	case "tab":
-		return tea.KeyTab
+		return tea.KeyPressMsg{Code: tea.KeyTab}
+	case "shift+tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	case "esc":
-		return tea.KeyEsc
+		return tea.KeyPressMsg{Code: tea.KeyEsc}
+	case "enter":
+		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	default:
-		return tea.KeyRunes
-	}
-}
-
-func runesForString(key string) []rune {
-	switch key {
-	case "tab", "shift+tab", "esc":
-		return nil
-	default:
-		return []rune(key)
+		runes := []rune(key)
+		if len(runes) == 0 {
+			return tea.KeyPressMsg{}
+		}
+		code := runes[0]
+		if len(runes) == 1 && code >= 'A' && code <= 'Z' {
+			return tea.KeyPressMsg{Code: code + ('a' - 'A'), ShiftedCode: code, Text: key, Mod: tea.ModShift}
+		}
+		return tea.KeyPressMsg{Code: code, Text: key}
 	}
 }

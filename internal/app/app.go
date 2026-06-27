@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/sgruendel/tuidledo/internal/config"
 	"github.com/sgruendel/tuidledo/internal/myn"
@@ -93,7 +93,7 @@ func New() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tea.EnableBracketedPaste, m.startupCmd())
+	return m.startupCmd()
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -160,13 +160,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
-	case tea.KeyMsg:
+	case tea.PasteMsg:
+		return m.handlePaste(msg)
+	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
 	return m, nil
 }
 
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	return tea.NewView(m.viewString())
+}
+
+func (m Model) viewString() string {
 	if m.state == stateLoading {
 		return titleStyle.Render("tuidledo") + "\n\n" + m.message + "\n"
 	}
@@ -188,7 +194,20 @@ func (m Model) View() string {
 	return m.taskView()
 }
 
-func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handlePaste(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
+	if m.state == stateSearch {
+		m.query += msg.Content
+		m.refreshVisible()
+		return m, nil
+	}
+	if m.state == stateCreate {
+		m.createTitle += msg.Content
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if m.state == stateSearch {
 		switch key {
@@ -210,8 +229,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, m.quitCmd()
 		default:
-			if msg.Type == tea.KeyRunes {
-				m.query += string(msg.Runes)
+			if text := msg.Key().Text; text != "" {
+				m.query += text
 				m.refreshVisible()
 			}
 			return m, nil
@@ -240,8 +259,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		default:
-			if msg.Type == tea.KeyRunes {
-				m.createTitle += string(msg.Runes)
+			if text := msg.Key().Text; text != "" {
+				m.createTitle += text
 			}
 			return m, nil
 		}
