@@ -350,15 +350,9 @@ func (m Model) startupCmd() tea.Cmd {
 
 		client := toodledo.NewClient(m.cfg.ClientID, m.cfg.ClientSecret, m.cfg.AccessToken)
 		cfg := m.cfg
-		if cfg.RefreshToken != "" && time.Now().After(cfg.TokenExpiry.Add(-5*time.Minute)) {
-			token, err := client.RefreshToken(ctx, cfg.RefreshToken)
-			if err == nil {
-				cfg.AccessToken = token.AccessToken
-				cfg.RefreshToken = token.RefreshToken
-				cfg.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-				_ = config.Save(cfg)
-				client.AccessToken = cfg.AccessToken
-			}
+		cfg, client, err := refreshTokenIfNeeded(ctx, cfg, client)
+		if err != nil {
+			return syncMsg{err: err}
 		}
 		if cfg.AccessToken == "" || time.Now().After(cfg.TokenExpiry) {
 			result, err := toodledo.WaitForAuthCode(ctx, cfg.ClientID)
@@ -443,6 +437,11 @@ func (m Model) createCmd(title string) tea.Cmd {
 func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Client) error) (config.Config, *toodledo.Client, error) {
 	cfg := m.cfg
 	client := toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
+	var err error
+	cfg, client, err = refreshTokenIfNeeded(ctx, cfg, client)
+	if err != nil {
+		return cfg, client, err
+	}
 	if err := operation(client); err != nil {
 		var unauthorized toodledo.UnauthorizedError
 		if !errors.As(err, &unauthorized) || cfg.RefreshToken == "" {
@@ -464,6 +463,24 @@ func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Cli
 			return cfg, client, retryErr
 		}
 	}
+	return cfg, client, nil
+}
+
+func refreshTokenIfNeeded(ctx context.Context, cfg config.Config, client *toodledo.Client) (config.Config, *toodledo.Client, error) {
+	if cfg.RefreshToken == "" || time.Now().Before(cfg.TokenExpiry.Add(-5*time.Minute)) {
+		return cfg, client, nil
+	}
+	token, err := client.RefreshToken(ctx, cfg.RefreshToken)
+	if err != nil {
+		return cfg, client, err
+	}
+	cfg.AccessToken = token.AccessToken
+	cfg.RefreshToken = token.RefreshToken
+	cfg.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
+	if err := config.Save(cfg); err != nil {
+		return cfg, client, err
+	}
+	client.AccessToken = cfg.AccessToken
 	return cfg, client, nil
 }
 
