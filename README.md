@@ -58,7 +58,10 @@ New tasks use the current context, medium priority, and today's start date.
 
 - `j` / `k` or arrows: move selection
 - `g` / `G`: jump to top/bottom
-- `tab` / `shift+tab`: jump between priority groups
+- `.` / `,`: jump to next/previous priority group
+- `tab` / `shift+tab`: same as `.` / `,`
+- `h` / `l`: collapse/expand active priority group
+- `enter`: expand/collapse priority header or open selected task details
 - `[` / `]`: switch context
 - `/`: search visible task titles
 - `n`: create new task in the current context

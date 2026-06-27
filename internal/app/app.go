@@ -77,31 +77,39 @@ const (
 	editFieldCount
 )
 
+type listRow struct {
+	priority int
+	task     *toodledo.Task
+}
+
 type Model struct {
-	cfg          config.Config
-	client       *toodledo.Client
-	state        state
-	previous     state
-	message      string
-	err          error
-	contexts     []toodledo.Context
-	contextIndex int
-	tasks        []toodledo.Task
-	visible      []toodledo.Task
-	cursor       int
-	query        string
-	createTitle  string
-	editTaskID   int64
-	editField    editField
-	titleInput   textinput.Model
-	noteInput    textarea.Model
-	editPriority int
-	startPicker  datepicker.Model
-	duePicker    datepicker.Model
-	editContext  int64
-	deleteTaskID int64
-	width        int
-	height       int
+	cfg                 config.Config
+	client              *toodledo.Client
+	state               state
+	previous            state
+	message             string
+	err                 error
+	contexts            []toodledo.Context
+	contextIndex        int
+	tasks               []toodledo.Task
+	visible             []toodledo.Task
+	rows                []listRow
+	cursor              int
+	activePriority      int
+	collapsedPriorities map[int]bool
+	query               string
+	createTitle         string
+	editTaskID          int64
+	editField           editField
+	titleInput          textinput.Model
+	noteInput           textarea.Model
+	editPriority        int
+	startPicker         datepicker.Model
+	duePicker           datepicker.Model
+	editContext         int64
+	deleteTaskID        int64
+	width               int
+	height              int
 }
 
 func New() Model {
@@ -428,23 +436,31 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.message = "Refreshing tasks..."
 		return m, m.syncCmd()
 	case "j", "down":
-		if m.cursor < len(m.visible)-1 {
+		if m.cursor < len(m.rows)-1 {
 			m.cursor++
+			m.updateActivePriorityFromCursor()
 		}
 	case "k", "up":
 		if m.cursor > 0 {
 			m.cursor--
+			m.updateActivePriorityFromCursor()
 		}
 	case "g", "home":
 		m.cursor = 0
+		m.updateActivePriorityFromCursor()
 	case "G", "end":
-		if len(m.visible) > 0 {
-			m.cursor = len(m.visible) - 1
+		if len(m.rows) > 0 {
+			m.cursor = len(m.rows) - 1
+			m.updateActivePriorityFromCursor()
 		}
-	case "tab":
+	case "tab", ".":
 		m.nextPriority()
-	case "shift+tab":
+	case "shift+tab", ",":
 		m.prevPriority()
+	case "h", "left":
+		m.setActivePriorityCollapsed(true)
+	case "l", "right":
+		m.setActivePriorityCollapsed(false)
 	case "]":
 		m.nextContext()
 	case "[":
@@ -455,23 +471,27 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.createTitle = ""
 		m.state = stateCreate
 	case "enter":
-		if len(m.visible) > 0 {
+		if m.currentTask() != nil {
 			m.state = stateDetails
+		} else if len(m.rows) > 0 {
+			m.toggleActivePriority()
 		}
 	case "e":
-		if m.state == stateDetails && len(m.visible) > 0 {
-			m.startEditForm(m.visible[m.cursor])
+		if m.state == stateDetails {
+			task := m.currentTask()
+			if task == nil {
+				return m, nil
+			}
+			m.startEditForm(*task)
 			return m, m.titleInput.Focus()
 		}
 	case "d":
-		if len(m.visible) > 0 {
-			task := m.visible[m.cursor]
+		if task := m.currentTask(); task != nil {
 			m.message = "Completing task..."
 			return m, m.completeCmd(task.ID)
 		}
 	case "D":
-		if len(m.visible) > 0 {
-			task := m.visible[m.cursor]
+		if task := m.currentTask(); task != nil {
 			m.deleteTaskID = task.ID
 			m.state = stateConfirmDelete
 		}
@@ -694,17 +714,44 @@ func fetchAll(ctx context.Context, client *toodledo.Client) ([]toodledo.Context,
 }
 
 func (m *Model) refreshVisible() {
-	contextID := int64(0)
-	if m.contextIndex > 0 && m.contextIndex-1 < len(m.contexts) {
-		contextID = m.contexts[m.contextIndex-1].ID
+	previousActive := m.activePriority
+	base := m.baseVisibleTasks()
+	m.visible = make([]toodledo.Task, 0, len(base))
+	m.rows = make([]listRow, 0, len(base)+4)
+	lastPriority := -2
+	for _, task := range base {
+		if task.Priority != lastPriority {
+			m.rows = append(m.rows, listRow{priority: task.Priority})
+			lastPriority = task.Priority
+		}
+		if m.collapsedPriorities[task.Priority] {
+			continue
+		}
+		taskCopy := task
+		m.rows = append(m.rows, listRow{priority: task.Priority, task: &taskCopy})
+		m.visible = append(m.visible, task)
 	}
-	m.visible = myn.VisibleTasks(m.tasks, contextID, m.query, time.Now())
-	if m.cursor >= len(m.visible) {
-		m.cursor = len(m.visible) - 1
+	if m.cursor >= len(m.rows) {
+		m.cursor = len(m.rows) - 1
 	}
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
+	groups := m.priorityGroups()
+	if len(groups) > 0 && !priorityIn(m.activePriority, groups) {
+		m.activePriority = groups[0]
+	}
+	if len(groups) > 0 && priorityIn(previousActive, groups) {
+		m.activePriority = previousActive
+	}
+}
+
+func (m Model) baseVisibleTasks() []toodledo.Task {
+	contextID := int64(0)
+	if m.contextIndex > 0 && m.contextIndex-1 < len(m.contexts) {
+		contextID = m.contexts[m.contextIndex-1].ID
+	}
+	return myn.VisibleTasks(m.tasks, contextID, m.query, time.Now())
 }
 
 func (m *Model) removeTask(taskID int64) {
@@ -894,42 +941,114 @@ func (m *Model) restoreContext() {
 }
 
 func (m *Model) nextPriority() {
-	if len(m.visible) == 0 {
+	priorities := m.priorityGroups()
+	if len(priorities) == 0 {
 		return
 	}
-	current := m.visible[m.cursor].Priority
-	for i := m.cursor + 1; i < len(m.visible); i++ {
-		if m.visible[i].Priority != current {
-			m.cursor = i
+	current := m.activePriority
+	for i, priority := range priorities {
+		if priority == current {
+			m.setActivePriority(priorities[(i+1)%len(priorities)])
 			return
 		}
 	}
-	m.cursor = 0
+	m.setActivePriority(priorities[0])
 }
 
 func (m *Model) prevPriority() {
-	if len(m.visible) == 0 {
+	priorities := m.priorityGroups()
+	if len(priorities) == 0 {
 		return
 	}
-	current := m.visible[m.cursor].Priority
-	for i := m.cursor - 1; i >= 0; i-- {
-		if m.visible[i].Priority != current {
-			targetPriority := m.visible[i].Priority
-			for i > 0 && m.visible[i-1].Priority == targetPriority {
-				i--
-			}
+	current := m.activePriority
+	for i, priority := range priorities {
+		if priority == current {
+			m.setActivePriority(priorities[(i+len(priorities)-1)%len(priorities)])
+			return
+		}
+	}
+	m.setActivePriority(priorities[len(priorities)-1])
+}
+
+func (m *Model) setActivePriority(priority int) {
+	m.activePriority = priority
+	for i, row := range m.rows {
+		if row.priority == priority {
 			m.cursor = i
 			return
 		}
 	}
-	lastPriority := m.visible[len(m.visible)-1].Priority
-	for i := len(m.visible) - 1; i >= 0; i-- {
-		if m.visible[i].Priority != lastPriority {
-			m.cursor = i + 1
-			return
+}
+
+func (m *Model) updateActivePriorityFromCursor() {
+	if len(m.rows) == 0 || m.cursor < 0 || m.cursor >= len(m.rows) {
+		return
+	}
+	m.activePriority = m.rows[m.cursor].priority
+}
+
+func (m Model) currentTask() *toodledo.Task {
+	if len(m.rows) == 0 || m.cursor < 0 || m.cursor >= len(m.rows) {
+		return nil
+	}
+	return m.rows[m.cursor].task
+}
+
+func (m *Model) toggleActivePriority() {
+	priorities := m.priorityGroups()
+	if len(priorities) == 0 {
+		return
+	}
+	if !priorityIn(m.activePriority, priorities) {
+		m.activePriority = priorities[0]
+	}
+	if m.collapsedPriorities == nil {
+		m.collapsedPriorities = make(map[int]bool)
+	}
+	m.collapsedPriorities[m.activePriority] = !m.collapsedPriorities[m.activePriority]
+	m.refreshVisible()
+	m.setActivePriority(m.activePriority)
+}
+
+func (m *Model) setActivePriorityCollapsed(collapsed bool) {
+	priorities := m.priorityGroups()
+	if len(priorities) == 0 {
+		return
+	}
+	if !priorityIn(m.activePriority, priorities) {
+		m.activePriority = priorities[0]
+	}
+	if m.collapsedPriorities == nil {
+		m.collapsedPriorities = make(map[int]bool)
+	}
+	if m.collapsedPriorities[m.activePriority] == collapsed {
+		return
+	}
+	m.collapsedPriorities[m.activePriority] = collapsed
+	m.refreshVisible()
+	m.setActivePriority(m.activePriority)
+}
+
+func (m Model) priorityGroups() []int {
+	base := m.baseVisibleTasks()
+	priorities := make([]int, 0, 4)
+	seen := make(map[int]bool)
+	for _, task := range base {
+		if !seen[task.Priority] {
+			seen[task.Priority] = true
+			priorities = append(priorities, task.Priority)
 		}
 	}
-	m.cursor = 0
+	return priorities
+}
+
+func priorityIn(priority int, priorities []int) bool {
+	for _, candidate := range priorities {
+		if candidate == priority {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Model) contextName() string {
@@ -972,24 +1091,36 @@ func (m Model) taskView() string {
 	}
 	b.WriteString("\n\n")
 
-	if len(m.visible) == 0 {
+	base := m.baseVisibleTasks()
+	if len(base) == 0 {
 		b.WriteString("No visible MYN tasks.\n")
 	} else {
 		lastPriority := -2
 		row := 0
-		for i, task := range m.visible {
-			if task.Priority != lastPriority {
-				if i > 0 {
+		for rowIndex, listRow := range m.rows {
+			if listRow.task == nil {
+				if rowIndex > 0 && listRow.priority != lastPriority {
 					b.WriteByte('\n')
 				}
-				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("  %-46s  %-10s  %-10s  %-18s", myn.PriorityLabel(task.Priority), "Start", "Due", "Repeat")))
+				header := myn.PriorityLabel(listRow.priority)
+				if m.collapsedPriorities[listRow.priority] {
+					header += " (collapsed)"
+				}
+				if rowIndex == m.cursor {
+					header = "> " + header
+				} else {
+					header = "  " + header
+				}
+				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("%-48s  %-10s  %-10s  %-18s", header, "Start", "Due", "Repeat")))
 				b.WriteByte('\n')
-				lastPriority = task.Priority
+				lastPriority = listRow.priority
+				continue
 			}
 
+			task := *listRow.task
 			cursor := "  "
 			style := taskRowStyle(row)
-			if i == m.cursor {
+			if rowIndex == m.cursor {
 				cursor = "> "
 				style = selectedStyle
 			}
@@ -1010,16 +1141,16 @@ func (m Model) taskView() string {
 		b.WriteString(subtleStyle.Render(m.message))
 		b.WriteString("\n")
 	}
-	b.WriteString(helpStyle.Render("j/k move | n new | d done | D delete | tab/S-tab priority | [ ] context | / search | enter details | r refresh | ? help | q quit"))
+	b.WriteString(helpStyle.Render("j/k move | n new | d done | D delete | h/l fold | ,/. priority | [ ] context | / search | enter details | r refresh | ? help | q quit"))
 	b.WriteByte('\n')
 	return b.String()
 }
 
 func (m Model) detailView() string {
-	if len(m.visible) == 0 {
+	task := m.currentTask()
+	if task == nil {
 		return m.taskView()
 	}
-	task := m.visible[m.cursor]
 	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nPriority: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
 		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), myn.PriorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
 }
@@ -1088,6 +1219,7 @@ func (m Model) helpView() string {
 j/k, arrows       move selection
 g/G               jump to top/bottom
 tab/shift+tab     jump between priority groups
+.                 collapse/expand active priority group
 [ / ]             switch context
 /                 search visible task titles
 n                 create new task in current context

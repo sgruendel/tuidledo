@@ -21,8 +21,8 @@ func TestNavigationMovesCursor(t *testing.T) {
 		t.Fatalf("cursor after k = %d, want 0", m.cursor)
 	}
 	m = updateKey(t, m, "G")
-	if m.cursor != len(m.visible)-1 {
-		t.Fatalf("cursor after G = %d, want %d", m.cursor, len(m.visible)-1)
+	if m.cursor != len(m.rows)-1 {
+		t.Fatalf("cursor after G = %d, want %d", m.cursor, len(m.rows)-1)
 	}
 	m = updateKey(t, m, "g")
 	if m.cursor != 0 {
@@ -34,12 +34,76 @@ func TestTabJumpsPriorityGroups(t *testing.T) {
 	m := testModel()
 
 	m = updateKey(t, m, "tab")
-	if m.cursor != 2 {
-		t.Fatalf("cursor after tab = %d, want first medium task at 2", m.cursor)
+	if m.cursor != 3 {
+		t.Fatalf("cursor after tab = %d, want medium header at 3", m.cursor)
 	}
 	m = updateKey(t, m, "shift+tab")
 	if m.cursor != 0 {
 		t.Fatalf("cursor after shift+tab = %d, want first high task at 0", m.cursor)
+	}
+}
+
+func TestDotCommaJumpPriorityGroups(t *testing.T) {
+	m := testModel()
+
+	m = updateKey(t, m, ".")
+	if m.activePriority != 1 || m.cursor != 3 {
+		t.Fatalf("after . priority=%d cursor=%d, want priority 1 cursor 3", m.activePriority, m.cursor)
+	}
+	m = updateKey(t, m, ",")
+	if m.activePriority != 2 || m.cursor != 0 {
+		t.Fatalf("after , priority=%d cursor=%d, want priority 2 cursor 0", m.activePriority, m.cursor)
+	}
+}
+
+func TestHLFoldsActivePriorityGroup(t *testing.T) {
+	m := testModel()
+	m.activePriority = 2
+
+	m = updateKey(t, m, "h")
+	if !m.collapsedPriorities[2] {
+		t.Fatal("priority 2 collapsed = false, want true")
+	}
+	if len(m.visible) != 1 || m.visible[0].Priority != 1 {
+		t.Fatalf("visible after collapse = %#v, want only medium priority", m.visible)
+	}
+	if m.activePriority != 2 {
+		t.Fatalf("activePriority after collapse = %d, want 2", m.activePriority)
+	}
+
+	m = updateKey(t, m, "l")
+	if m.collapsedPriorities[2] {
+		t.Fatal("priority 2 collapsed = true, want false")
+	}
+	if len(m.visible) != 3 {
+		t.Fatalf("visible after expand = %d, want 3", len(m.visible))
+	}
+}
+
+func TestEnterTogglesPriorityHeader(t *testing.T) {
+	m := testModel()
+
+	m = updateKey(t, m, "enter")
+	if !m.collapsedPriorities[2] {
+		t.Fatal("priority 2 collapsed after enter = false, want true")
+	}
+	m = updateKey(t, m, "enter")
+	if m.collapsedPriorities[2] {
+		t.Fatal("priority 2 collapsed after second enter = true, want false")
+	}
+}
+
+func TestTabVisitsCollapsedPriorityGroups(t *testing.T) {
+	m := testModel()
+	m.activePriority = 2
+	m = updateKey(t, m, "h")
+	m = updateKey(t, m, "tab")
+	if m.activePriority != 1 {
+		t.Fatalf("activePriority after tab = %d, want 1", m.activePriority)
+	}
+	m = updateKey(t, m, "shift+tab")
+	if m.activePriority != 2 {
+		t.Fatalf("activePriority after shift+tab = %d, want 2", m.activePriority)
 	}
 }
 
@@ -93,6 +157,7 @@ func TestEditFormInitializesFromDetails(t *testing.T) {
 	m.tasks[0].StartDate = toodledo.NoonUnix(time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC))
 	m.tasks[0].DueDate = toodledo.NoonUnix(time.Date(2026, 6, 23, 0, 0, 0, 0, time.UTC))
 	m.refreshVisible()
+	m = selectFirstTask(t, m)
 
 	m = updateKey(t, m, "enter")
 	m = updateKey(t, m, "e")
@@ -122,6 +187,7 @@ func TestEditFormInitializesFromDetails(t *testing.T) {
 
 func TestEditFormPrioritySelection(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "enter")
 	m = updateKey(t, m, "e")
 	m.focusEditField(editFieldPriority)
@@ -142,6 +208,7 @@ func TestEditFormPrioritySelection(t *testing.T) {
 
 func TestEditFormTabSwitchesFields(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "enter")
 	m = updateKey(t, m, "e")
 
@@ -157,6 +224,7 @@ func TestEditFormTabSwitchesFields(t *testing.T) {
 
 func TestEditFormContextSelection(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "enter")
 	m = updateKey(t, m, "e")
 	m.focusEditField(editFieldContext)
@@ -173,6 +241,7 @@ func TestEditFormContextSelection(t *testing.T) {
 
 func TestEditFormDatePickerSelection(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "enter")
 	m = updateKey(t, m, "e")
 	m.focusEditField(editFieldStart)
@@ -242,6 +311,7 @@ func TestDeleteMsgRemovesTask(t *testing.T) {
 
 func TestDeleteKeyOpensConfirmation(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 
 	m = updateKey(t, m, "D")
 	if m.state != stateConfirmDelete {
@@ -254,6 +324,7 @@ func TestDeleteKeyOpensConfirmation(t *testing.T) {
 
 func TestDeleteConfirmationCancel(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "D")
 	m = updateKey(t, m, "n")
 
@@ -270,6 +341,7 @@ func TestDeleteConfirmationCancel(t *testing.T) {
 
 func TestDeleteConfirmationConfirmReturnsCommand(t *testing.T) {
 	m := testModel()
+	m = selectFirstTask(t, m)
 	m = updateKey(t, m, "D")
 
 	msg := keyPress("y")
@@ -310,6 +382,14 @@ func testModel() Model {
 	}
 	m.refreshVisible()
 	return m
+}
+
+func selectFirstTask(t *testing.T, m Model) Model {
+	t.Helper()
+	if task := m.currentTask(); task != nil {
+		return m
+	}
+	return updateKey(t, m, "j")
 }
 
 func updateKey(t *testing.T, m Model, key string) Model {
