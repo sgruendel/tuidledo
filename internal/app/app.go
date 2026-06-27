@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -38,16 +39,19 @@ type syncMsg struct {
 
 type completeMsg struct {
 	taskID int64
+	cfg    config.Config
 	err    error
 }
 
 type deleteMsg struct {
 	taskID int64
+	cfg    config.Config
 	err    error
 }
 
 type createMsg struct {
 	task toodledo.Task
+	cfg  config.Config
 	err  error
 }
 
@@ -121,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		m.applyConfig(msg.cfg)
 		m.removeTask(msg.taskID)
 		m.message = "Completed task"
 		m.refreshVisible()
@@ -131,6 +136,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		m.applyConfig(msg.cfg)
 		m.removeTask(msg.taskID)
 		m.message = "Deleted task"
 		m.refreshVisible()
@@ -141,6 +147,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
+		m.applyConfig(msg.cfg)
 		m.tasks = append(m.tasks, msg.task)
 		m.createTitle = ""
 		m.state = stateTasks
@@ -380,8 +387,14 @@ func (m Model) syncCmd() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		contexts, tasks, err := fetchAll(ctx, m.client)
-		return syncMsg{contexts: contexts, tasks: tasks, err: err}
+		var contexts []toodledo.Context
+		var tasks []toodledo.Task
+		cfg, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
+			var err error
+			contexts, tasks, err = fetchAll(ctx, client)
+			return err
+		})
+		return syncMsg{contexts: contexts, tasks: tasks, cfg: cfg, err: err}
 	}
 }
 
@@ -389,7 +402,10 @@ func (m Model) completeCmd(taskID int64) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		return completeMsg{taskID: taskID, err: m.client.CompleteTask(ctx, taskID, time.Now())}
+		cfg, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
+			return client.CompleteTask(ctx, taskID, time.Now())
+		})
+		return completeMsg{taskID: taskID, cfg: cfg, err: err}
 	}
 }
 
@@ -397,7 +413,10 @@ func (m Model) deleteCmd(taskID int64) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		return deleteMsg{taskID: taskID, err: m.client.DeleteTask(ctx, taskID)}
+		cfg, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
+			return client.DeleteTask(ctx, taskID)
+		})
+		return deleteMsg{taskID: taskID, cfg: cfg, err: err}
 	}
 }
 
@@ -411,9 +430,49 @@ func (m Model) createCmd(title string) tea.Cmd {
 			StartDate: toodledo.NoonUnix(time.Now()),
 			Context:   m.currentContextID(),
 		}
-		created, err := m.client.AddTask(ctx, task)
-		return createMsg{task: created, err: err}
+		var created toodledo.Task
+		cfg, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
+			var err error
+			created, err = client.AddTask(ctx, task)
+			return err
+		})
+		return createMsg{task: created, cfg: cfg, err: err}
 	}
+}
+
+func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Client) error) (config.Config, *toodledo.Client, error) {
+	cfg := m.cfg
+	client := toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
+	if err := operation(client); err != nil {
+		var unauthorized toodledo.UnauthorizedError
+		if !errors.As(err, &unauthorized) || cfg.RefreshToken == "" {
+			return cfg, client, err
+		}
+
+		token, refreshErr := client.RefreshToken(ctx, cfg.RefreshToken)
+		if refreshErr != nil {
+			return cfg, client, refreshErr
+		}
+		cfg.AccessToken = token.AccessToken
+		cfg.RefreshToken = token.RefreshToken
+		cfg.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
+		if saveErr := config.Save(cfg); saveErr != nil {
+			return cfg, client, saveErr
+		}
+		client.AccessToken = cfg.AccessToken
+		if retryErr := operation(client); retryErr != nil {
+			return cfg, client, retryErr
+		}
+	}
+	return cfg, client, nil
+}
+
+func (m *Model) applyConfig(cfg config.Config) {
+	if cfg.AccessToken == "" {
+		return
+	}
+	m.cfg = cfg
+	m.client = toodledo.NewClient(cfg.ClientID, cfg.ClientSecret, cfg.AccessToken)
 }
 
 func (m Model) quitCmd() tea.Cmd {

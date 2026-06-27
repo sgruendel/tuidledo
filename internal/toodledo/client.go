@@ -23,6 +23,14 @@ type Client struct {
 	ClientSecret string
 }
 
+type UnauthorizedError struct {
+	Body string
+}
+
+func (e UnauthorizedError) Error() string {
+	return "toodledo unauthorized: " + e.Body
+}
+
 func NewClient(clientID, clientSecret, accessToken string) *Client {
 	return &Client{
 		HTTPClient:   &http.Client{Timeout: 20 * time.Second},
@@ -238,6 +246,9 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 		return nil, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		if resp.StatusCode == http.StatusUnauthorized {
+			return nil, UnauthorizedError{Body: strings.TrimSpace(string(body))}
+		}
 		return nil, fmt.Errorf("toodledo http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return body, nil
