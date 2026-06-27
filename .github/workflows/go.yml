@@ -93,6 +93,7 @@ jobs:
           test -n "$TOODLEDO_CLIENT_SECRET"
 
           dist_dir="dist/tuidledo_${VERSION}_${ASSET_SUFFIX}"
+          archive_path="dist/tuidledo_${VERSION}_${ASSET_SUFFIX}.${ARCHIVE_EXT}"
           mkdir -p "$dist_dir"
 
           go build -trimpath \
@@ -108,17 +109,23 @@ jobs:
               zip -r "tuidledo_${VERSION}_${ASSET_SUFFIX}.zip" "tuidledo_${VERSION}_${ASSET_SUFFIX}"
             )
           else
-            tar -C dist -czf "dist/tuidledo_${VERSION}_${ASSET_SUFFIX}.tar.gz" "tuidledo_${VERSION}_${ASSET_SUFFIX}"
+            tar -C dist -czf "$archive_path" "tuidledo_${VERSION}_${ASSET_SUFFIX}"
           fi
+
+          sha256sum "$archive_path" > "$archive_path.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}
-          path: dist/tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}
+          path: |
+            dist/tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}
+            dist/tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}.sha256
 
       - name: Publish GitHub release asset
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/tuidledo_${{ github.ref_name }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}
+          files: |
+            dist/tuidledo_${{ github.ref_name }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}
+            dist/tuidledo_${{ github.ref_name }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}.sha256

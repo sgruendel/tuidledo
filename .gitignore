@@ -33,3 +33,6 @@ go.work.sum
 
 # built binary
 /tuidledo
+
+# local release packaging output
+/dist/

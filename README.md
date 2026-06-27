@@ -70,10 +70,11 @@ go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X
 
 ## Releases
 
-The GitHub Actions workflow does two things:
+The GitHub Actions workflow does three things:
 
 - runs formatting, tests, and a normal build on pushes and pull requests
 - builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64, and macOS arm64 on tags like `v0.1.0`
+- publishes a matching `.sha256` checksum file for each release archive
 
 To enable release builds, add these repository secrets:
 
@@ -87,8 +88,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-That tag run uploads workflow artifacts and publishes the packaged binaries as
-GitHub release assets.
+That tag run uploads workflow artifacts and publishes the packaged binaries plus
+their checksum files as GitHub release assets.
 
 On first launch, open the printed authorization URL and approve access. Tokens
 and the last selected context are stored in your user config directory as
