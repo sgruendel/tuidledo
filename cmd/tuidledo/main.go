@@ -9,7 +9,14 @@ import (
 	"github.com/sgruendel/tuidledo/internal/app"
 )
 
+var version = "dev"
+
 func main() {
+	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
+		fmt.Printf("tuidledo %s\n", version)
+		return
+	}
+
 	program := tea.NewProgram(app.New())
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "tuidledo: %v\n", err)
