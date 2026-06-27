@@ -6,7 +6,8 @@ Go TUI client for Toodledo, focused on a Master Your Now style task list.
 
 ## Status
 
-Early scaffold. The first version supports:
+Version 0.1 is focused on core MYN task management rather than full Toodledo
+feature coverage. It supports:
 
 - Toodledo API v3 OAuth login with a localhost callback
 - MYN-style task filtering
@@ -15,6 +16,10 @@ Early scaffold. The first version supports:
 - Task creation with MYN defaults
 - Task completion
 - Task deletion with confirmation
+- Task details and editing for title, note, priority, start date, due date, and context
+
+Not currently supported: folders, goals, tags, subtasks, saved searches, full
+repeat editing, file attachment management, or non-MYN list modes.
 
 ## Setup
 
@@ -35,6 +40,18 @@ Run the TUI:
 
 ```sh
 go run ./cmd/tuidledo
+```
+
+Print the version:
+
+```sh
+tuidledo --version
+```
+
+Release builds can stamp the version with:
+
+```sh
+go build -ldflags "-X main.version=0.1.0" ./cmd/tuidledo
 ```
 
 On first launch, open the printed authorization URL and approve access. Tokens
