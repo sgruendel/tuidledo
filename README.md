@@ -14,6 +14,7 @@ Early scaffold. The first version supports:
 - Vim/lazygit-style navigation
 - Task creation with MYN defaults
 - Task completion
+- Task deletion with confirmation
 
 ## Setup
 
@@ -36,7 +37,9 @@ Run the TUI:
 go run ./cmd/tuidledo
 ```
 
-On first launch, open the printed authorization URL and approve access. Tokens and the last selected context are stored in your user config directory as `tuidledo/config.json`.
+On first launch, open the printed authorization URL and approve access. Tokens
+and the last selected context are stored in your user config directory as
+`tuidledo/config.json`.
 
 ## MYN Filtering
 
@@ -46,7 +49,8 @@ The task list hides:
 - negative-priority tasks
 - tasks with a future start date
 
-Visible tasks are sorted by priority first, then start date descending within each priority group.
+Visible tasks are sorted by priority first, then start date descending within
+each priority group.
 
 New tasks use the current context, medium priority, and today's start date.
 
@@ -57,8 +61,8 @@ New tasks use the current context, medium priority, and today's start date.
 - `tab` / `shift+tab`: jump between priority groups
 - `[` / `]`: switch context
 - `/`: search visible task titles
-- `n`: create task in the current context
-- `d`: complete selected task
+- `n`: create new task in the current context
+- `d`: mark selected task done
 - `D`: ask to delete selected task
 - `enter`: show task details
 - `r`: refresh from Toodledo
@@ -69,7 +73,8 @@ New tasks use the current context, medium priority, and today's start date.
 
 ## tmux Hyperlinks
 
-Task notes use terminal hyperlinks for URLs. If links work directly in your terminal but not inside tmux, enable passthrough in `~/.tmux.conf`:
+Task notes use terminal hyperlinks for URLs. If links work directly in your
+terminal but not inside tmux, enable passthrough in `~/.tmux.conf`:
 
 ```tmux
 set -g allow-passthrough on

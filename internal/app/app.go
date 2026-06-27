@@ -641,8 +641,8 @@ g/G               jump to top/bottom
 tab/shift+tab     jump between priority groups
 [ / ]             switch context
 /                 search visible task titles
-n                 create task in current context
-d                 complete selected task
+n                 create new task in current context
+d                 mark selected task done
 D                 ask to delete selected task
 enter             show task details
 r                 refresh from Toodledo
