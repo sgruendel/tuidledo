@@ -14,6 +14,8 @@ import (
 
 const baseURL = "https://api.toodledo.com/3"
 
+var apiBaseURL = baseURL
+
 const taskFields = "priority,startdate,duedate,repeat,context,note,attachment"
 
 type Client struct {
@@ -102,6 +104,7 @@ func (c *Client) GetTasks(ctx context.Context) ([]Task, error) {
 func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	payload, err := json.Marshal([]map[string]any{{
 		"title":     task.Title,
+		"note":      task.Note,
 		"priority":  task.Priority,
 		"startdate": task.StartDate,
 		"context":   task.Context,
@@ -211,7 +214,7 @@ func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
 }
 
 func (c *Client) token(ctx context.Context, params url.Values) (Token, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/account/token.php", strings.NewReader(params.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+"/account/token.php", strings.NewReader(params.Encode()))
 	if err != nil {
 		return Token{}, err
 	}
@@ -240,7 +243,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, dest a
 	params.Set("access_token", c.AccessToken)
 	params.Set("f", "json")
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path+"?"+params.Encode(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiBaseURL+path+"?"+params.Encode(), nil)
 	if err != nil {
 		return err
 	}
@@ -254,7 +257,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, dest a
 func (c *Client) post(ctx context.Context, path string, params url.Values, dest any) error {
 	params.Set("access_token", c.AccessToken)
 	params.Set("f", "json")
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+path, bytes.NewBufferString(params.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+path, bytes.NewBufferString(params.Encode()))
 	if err != nil {
 		return err
 	}

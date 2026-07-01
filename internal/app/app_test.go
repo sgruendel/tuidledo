@@ -142,12 +142,64 @@ func TestCreateInputAcceptsPastedRunesAndCancels(t *testing.T) {
 
 	m = updateKey(t, m, "n")
 	m = updateRunes(t, m, "Pasted title")
-	if m.createTitle != "Pasted title" {
-		t.Fatalf("createTitle = %q, want pasted text", m.createTitle)
+	if m.titleInput.Value() != "Pasted title" {
+		t.Fatalf("titleInput = %q, want pasted text", m.titleInput.Value())
 	}
 	m = updateKey(t, m, "esc")
-	if m.state != stateTasks || m.createTitle != "" {
-		t.Fatalf("after esc state=%v createTitle=%q, want task state and empty title", m.state, m.createTitle)
+	if m.state != stateTasks || m.titleInput.Value() != "" || m.noteInput.Value() != "" {
+		t.Fatalf("after esc state=%v title=%q note=%q, want task state and empty create form", m.state, m.titleInput.Value(), m.noteInput.Value())
+	}
+}
+
+func TestCreateFormTabSwitchesToNoteField(t *testing.T) {
+	m := testModel()
+
+	m = updateKey(t, m, "n")
+	if m.editField != editFieldTitle {
+		t.Fatalf("editField after n = %v, want title", m.editField)
+	}
+	m = updateKey(t, m, "tab")
+	if m.editField != editFieldNote {
+		t.Fatalf("editField after tab = %v, want note", m.editField)
+	}
+	m = updateRunes(t, m, "task note")
+	if m.noteInput.Value() != "task note" {
+		t.Fatalf("noteInput = %q, want task note", m.noteInput.Value())
+	}
+	m = updateKey(t, m, "shift+tab")
+	if m.editField != editFieldTitle {
+		t.Fatalf("editField after shift+tab = %v, want title", m.editField)
+	}
+}
+
+func TestCreateFormEnterOnNoteAddsNewline(t *testing.T) {
+	m := testModel()
+
+	m = updateKey(t, m, "n")
+	m = updateKey(t, m, "tab")
+	m = updateRunes(t, m, "line one")
+	m = updateKey(t, m, "enter")
+	m = updateRunes(t, m, "line two")
+	if m.noteInput.Value() != "line one\nline two" {
+		t.Fatalf("noteInput = %q, want multiline note", m.noteInput.Value())
+	}
+	if m.state != stateCreate {
+		t.Fatalf("state after enter in note = %v, want stateCreate", m.state)
+	}
+}
+
+func TestCreatedTaskValuesIncludeNote(t *testing.T) {
+	m := testModel()
+	m.startCreateForm()
+	m.titleInput.SetValue("new task")
+	m.noteInput.SetValue("new note")
+
+	title, note, err := m.createdTaskValues()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if title != "new task" || note != "new note" {
+		t.Fatalf("createdTaskValues() = (%q, %q)", title, note)
 	}
 }
 

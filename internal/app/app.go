@@ -100,7 +100,6 @@ type Model struct {
 	activePriority      int
 	collapsedPriorities map[int]bool
 	query               string
-	createTitle         string
 	editTaskID          int64
 	editField           editField
 	titleInput          textinput.Model
@@ -191,7 +190,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.applyConfig(msg.cfg)
 		m.tasks = append(m.tasks, msg.task)
-		m.createTitle = ""
+		m.clearCreateForm()
 		m.state = stateTasks
 		m.message = "Created task"
 		m.refreshVisible()
@@ -265,8 +264,7 @@ func (m Model) handlePaste(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.state == stateCreate {
-		m.createTitle += msg.Content
-		return m, nil
+		return m.updateFocusedCreateInput(msg)
 	}
 	if m.state == stateEditTask {
 		return m.updateFocusedEditInput(msg)
@@ -306,31 +304,39 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.state == stateCreate {
 		switch key {
 		case "esc":
-			m.createTitle = ""
+			m.message = ""
+			m.clearCreateForm()
 			m.state = stateTasks
 			return m, nil
 		case "ctrl+c":
 			return m, m.quitCmd()
+		case "tab":
+			m.focusCreateField((m.editField + 1) % 2)
+			return m, nil
+		case "shift+tab":
+			m.focusCreateField((m.editField + 1) % 2)
+			return m, nil
 		case "enter":
-			title := strings.TrimSpace(m.createTitle)
-			if title == "" {
-				m.message = "Task title cannot be empty"
-				m.state = stateTasks
+			if m.editField == editFieldNote {
+				return m.updateFocusedCreateInput(msg)
+			}
+			title, note, err := m.createdTaskValues()
+			if err != nil {
+				m.message = err.Error()
 				return m, nil
 			}
 			m.message = "Creating task..."
-			return m, m.createCmd(title)
-		case "backspace", "ctrl+h":
-			if len(m.createTitle) > 0 {
-				m.createTitle = trimLastRune(m.createTitle)
+			return m, m.createCmd(title, note)
+		case "ctrl+s":
+			title, note, err := m.createdTaskValues()
+			if err != nil {
+				m.message = err.Error()
+				return m, nil
 			}
-			return m, nil
-		default:
-			if text := msg.Key().Text; text != "" {
-				m.createTitle += text
-			}
-			return m, nil
+			m.message = "Creating task..."
+			return m, m.createCmd(title, note)
 		}
+		return m.updateFocusedCreateInput(msg)
 	}
 	if m.state == stateEditTask {
 		switch key {
@@ -472,8 +478,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.state = stateSearch
 	case "n":
-		m.createTitle = ""
-		m.state = stateCreate
+		m.startCreateForm()
+		return m, m.titleInput.Focus()
 	case "enter":
 		if m.currentTask() != nil {
 			m.state = stateDetails
@@ -577,12 +583,13 @@ func (m Model) deleteCmd(taskID int64) tea.Cmd {
 	}
 }
 
-func (m Model) createCmd(title string) tea.Cmd {
+func (m Model) createCmd(title, note string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		task := toodledo.Task{
 			Title:     title,
+			Note:      note,
 			Priority:  1,
 			StartDate: toodledo.NoonUnix(time.Now()),
 			Context:   m.currentContextID(),
@@ -595,6 +602,14 @@ func (m Model) createCmd(title string) tea.Cmd {
 		})
 		return createMsg{task: created, cfg: cfg, err: err}
 	}
+}
+
+func (m Model) createdTaskValues() (string, string, error) {
+	title := strings.TrimSpace(m.titleInput.Value())
+	if title == "" {
+		return "", "", fmt.Errorf("task title cannot be empty")
+	}
+	return title, m.noteInput.Value(), nil
 }
 
 func (m Model) editCmd() tea.Cmd {
@@ -789,6 +804,20 @@ func (m *Model) startEditForm(task toodledo.Task) {
 	m.focusEditField(editFieldTitle)
 }
 
+func (m *Model) startCreateForm() {
+	m.message = ""
+	m.titleInput = newTitleInput("", m.width)
+	m.noteInput = newNoteInput("", m.width)
+	m.state = stateCreate
+	m.focusCreateField(editFieldTitle)
+}
+
+func (m *Model) clearCreateForm() {
+	m.editField = editFieldTitle
+	m.titleInput = textinput.Model{}
+	m.noteInput = textarea.Model{}
+}
+
 func (m *Model) clearEditForm() {
 	m.editTaskID = 0
 	m.editField = editFieldTitle
@@ -816,6 +845,27 @@ func (m *Model) focusEditField(field editField) {
 	case editFieldDue:
 		m.duePicker.SetFocus(datepicker.FocusCalendar)
 	}
+}
+
+func (m *Model) focusCreateField(field editField) {
+	m.editField = field
+	m.titleInput.Blur()
+	m.noteInput.Blur()
+	if field == editFieldNote {
+		m.noteInput.Focus()
+		return
+	}
+	m.titleInput.Focus()
+}
+
+func (m Model) updateFocusedCreateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	if m.editField == editFieldNote {
+		m.noteInput, cmd = m.noteInput.Update(msg)
+		return m, cmd
+	}
+	m.titleInput, cmd = m.titleInput.Update(msg)
+	return m, cmd
 }
 
 func (m Model) updateFocusedEditInput(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1194,8 +1244,18 @@ func (m Model) dateFieldView(field editField, picker datepicker.Model) string {
 }
 
 func (m Model) createView() string {
-	return fmt.Sprintf("%s\n\nContext: %s\nPriority: Med\nStart: %s\n\nTask title:\n> %s\n\n%s\n",
-		titleStyle.Render("New Task"), m.contextName(), myn.DateLabel(toodledo.NoonUnix(time.Now())), m.createTitle, helpStyle.Render("enter create | esc cancel"))
+	message := ""
+	if m.message != "" {
+		message = subtleStyle.Render(m.message) + "\n\n"
+	}
+	return fmt.Sprintf("%s\n\nContext: %s\nPriority: Med\nStart: %s\n\nTitle\n%s\n\nNote\n%s\n\n%s%s\n",
+		titleStyle.Render("New Task"),
+		m.contextName(),
+		myn.DateLabel(toodledo.NoonUnix(time.Now())),
+		m.titleInput.View(),
+		m.noteInput.View(),
+		message,
+		helpStyle.Render("tab next field | shift+tab previous | enter create from title | ctrl+s create | esc cancel"))
 }
 
 func (m Model) confirmDeleteView() string {
@@ -1235,6 +1295,9 @@ r                 refresh from Toodledo
 esc               back or clear search
 q                 back, or quit from task list
 ctrl+c            quit
+
+Create form: tab/shift+tab switches fields, enter creates from title, ctrl+s creates, esc cancels.
+Enter in the note field inserts a newline.
 
 Edit form: tab/shift+tab switches fields, ctrl+s saves, esc cancels.
 Priority and context fields cycle with [ ], or enter.
