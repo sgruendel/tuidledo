@@ -36,3 +36,7 @@ go.work.sum
 
 # local release packaging output
 /dist/
+
+
+# local env file
+.env.local

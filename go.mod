@@ -7,6 +7,7 @@ require (
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
 	github.com/ethanefung/bubble-datepicker v0.1.1
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

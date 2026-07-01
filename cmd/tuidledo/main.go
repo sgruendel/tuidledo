@@ -5,6 +5,7 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/joho/godotenv"
 
 	"github.com/sgruendel/tuidledo/internal/app"
 )
@@ -14,6 +15,8 @@ var clientID = ""
 var clientSecret = ""
 
 func main() {
+	loadLocalEnv()
+
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-version") {
 		fmt.Printf("tuidledo %s\n", version)
 		return
@@ -24,4 +27,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "tuidledo: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func loadLocalEnv() {
+	if _, err := os.Stat(".env.local"); err != nil {
+		return
+	}
+
+	_ = godotenv.Load(".env.local")
 }

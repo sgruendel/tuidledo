@@ -33,12 +33,21 @@ Register an app with Toodledo and configure this redirect URI:
 http://127.0.0.1:8765/callback
 ```
 
-Export your app credentials:
+Set your app credentials with either real environment variables or a local
+`.env.local` file:
 
 ```sh
 export TOODLEDO_CLIENT_ID="your-client-id"
 export TOODLEDO_CLIENT_SECRET="your-client-secret"
 ```
+
+```dotenv
+TOODLEDO_CLIENT_ID=your-client-id
+TOODLEDO_CLIENT_SECRET=your-client-secret
+```
+
+When present, `.env.local` is loaded on startup for local development only.
+Existing environment variables still take precedence.
 
 Run the TUI:
 
