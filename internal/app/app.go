@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 	datepicker "github.com/ethanefung/bubble-datepicker"
 
+	"github.com/sgruendel/tuidledo/internal/config"
 	"github.com/sgruendel/tuidledo/internal/myn"
 	statepkg "github.com/sgruendel/tuidledo/internal/state"
 	"github.com/sgruendel/tuidledo/internal/toodledo"
@@ -85,6 +86,7 @@ type listRow struct {
 type Model struct {
 	clientID            string
 	clientSecret        string
+	config              config.Config
 	st                  statepkg.State
 	client              *toodledo.Client
 	state               state
@@ -113,7 +115,13 @@ type Model struct {
 	height              int
 }
 
+type priorityWarning struct {
+	count int
+	max   int
+}
+
 func New(clientID, clientSecret string) Model {
+	appConfig, configErr := config.Load()
 	st, err := statepkg.Load()
 	if clientID == "" {
 		clientID = os.Getenv("TOODLEDO_CLIENT_ID")
@@ -121,7 +129,12 @@ func New(clientID, clientSecret string) Model {
 	if clientSecret == "" {
 		clientSecret = os.Getenv("TOODLEDO_CLIENT_SECRET")
 	}
-	m := Model{st: st, state: stateLoading, message: "Starting tuidledo...\n\nIf authorization is needed, open the URL printed below and return here after approving access."}
+	m := Model{config: appConfig, st: st, state: stateLoading, message: "Starting tuidledo...\n\nIf authorization is needed, open the URL printed below and return here after approving access."}
+	if configErr != nil {
+		m.state = stateError
+		m.err = configErr
+		return m
+	}
 	if err != nil {
 		m.state = stateError
 		m.err = err
@@ -1096,6 +1109,40 @@ func (m Model) priorityGroups() []int {
 	return priorities
 }
 
+func (m Model) priorityWarning(priority int, visible []toodledo.Task) (priorityWarning, bool) {
+	if m.contextIndex == 0 {
+		return priorityWarning{}, false
+	}
+
+	max := m.priorityMaxTasks(priority)
+	if max == 0 {
+		return priorityWarning{}, false
+	}
+
+	count := 0
+	for _, task := range visible {
+		if task.Priority == priority {
+			count++
+		}
+	}
+	if count <= max {
+		return priorityWarning{}, false
+	}
+
+	return priorityWarning{count: count, max: max}, true
+}
+
+func (m Model) priorityMaxTasks(priority int) int {
+	switch priority {
+	case 2:
+		return m.config.MYN.CriticalNowMaxTasks
+	case 1:
+		return m.config.MYN.OpportunityNowMaxTasks
+	default:
+		return 0
+	}
+}
+
 func priorityIn(priority int, priorities []int) bool {
 	for _, candidate := range priorities {
 		if candidate == priority {
@@ -1157,6 +1204,9 @@ func (m Model) taskView() string {
 					b.WriteByte('\n')
 				}
 				header := myn.PriorityLabel(listRow.priority)
+				if warning, ok := m.priorityWarning(listRow.priority, base); ok {
+					header += fmt.Sprintf(" (warning: %d/%d)", warning.count, warning.max)
+				}
 				if m.collapsedPriorities[listRow.priority] {
 					header += " (collapsed)"
 				}

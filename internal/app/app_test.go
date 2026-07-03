@@ -1,11 +1,13 @@
 package app
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/sgruendel/tuidledo/internal/config"
 	"github.com/sgruendel/tuidledo/internal/toodledo"
 )
 
@@ -120,6 +122,30 @@ func TestBracketKeysSwitchContext(t *testing.T) {
 	m = updateKey(t, m, "[")
 	if m.contextIndex != 0 {
 		t.Fatalf("contextIndex after [ = %d, want 0", m.contextIndex)
+	}
+}
+
+func TestTaskViewShowsPriorityWarningForSingleContext(t *testing.T) {
+	m := testModel()
+	m.config = config.Config{MYN: config.MYNConfig{CriticalNowMaxTasks: 1, OpportunityNowMaxTasks: 20}}
+	m.contextIndex = 1
+	m.refreshVisible()
+
+	view := m.taskView()
+	if !strings.Contains(view, "High (warning: 2/1)") {
+		t.Fatalf("taskView() missing single-context warning: %q", view)
+	}
+}
+
+func TestTaskViewDoesNotShowPriorityWarningForAllContexts(t *testing.T) {
+	m := testModel()
+	m.config = config.Config{MYN: config.MYNConfig{CriticalNowMaxTasks: 1, OpportunityNowMaxTasks: 1}}
+	m.contextIndex = 0
+	m.refreshVisible()
+
+	view := m.taskView()
+	if strings.Contains(view, "warning:") {
+		t.Fatalf("taskView() unexpectedly contained warning: %q", view)
 	}
 }
 

@@ -29,6 +29,9 @@ Prebuilt release binaries can embed the shared Toodledo OAuth client credentials
 Locally, `state.json` stores only access tokens, refresh tokens, token expiry, and
 the last selected context.
 
+Optional UI settings live in `config.toml`. By default, MYN warnings use a maximum
+of 5 Critical Now tasks and 20 Opportunity Now tasks per context.
+
 Register an app with Toodledo and configure this redirect URI:
 
 ```text
@@ -122,6 +125,26 @@ Visible tasks are sorted by priority first, then start date descending within
 each priority group.
 
 New tasks use the current context, medium priority, and today's start date.
+
+When you are viewing a single context, tuidledo shows a warning next to the
+priority label if the context exceeds the configured MYN limit for that priority:
+
+- High priority (Critical Now): default max 5 tasks
+- Med priority (Opportunity Now): default max 20 tasks
+
+Configure those limits in `config.toml`:
+
+```toml
+[myn]
+critical_now_max_tasks = 5
+opportunity_now_max_tasks = 20
+```
+
+`config.toml` lives in your user config directory:
+
+- Linux: `$XDG_CONFIG_HOME/tuidledo/config.toml`, or `~/.config/tuidledo/config.toml`
+- macOS: `~/Library/Application Support/tuidledo/config.toml`
+- Windows: `%AppData%\tuidledo\config.toml`
 
 ## Keybindings
 
