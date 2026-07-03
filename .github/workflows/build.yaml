@@ -115,7 +115,7 @@ jobs:
           sha256sum "$archive_path" > "$archive_path.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}
           path: |
