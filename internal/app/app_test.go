@@ -137,6 +137,34 @@ func TestTaskViewShowsPriorityWarningForSingleContext(t *testing.T) {
 	}
 }
 
+func TestTaskViewUsesConfiguredPriorityLabels(t *testing.T) {
+	m := testModel()
+	m.config = config.Default()
+	m.config.MYN.HighLabel = "Critical Now"
+	m.config.MYN.MedLabel = "Opportunity Now"
+
+	view := m.taskView()
+	if !strings.Contains(view, "Critical Now") {
+		t.Fatalf("taskView() missing configured high label: %q", view)
+	}
+	if !strings.Contains(view, "Opportunity Now") {
+		t.Fatalf("taskView() missing configured med label: %q", view)
+	}
+}
+
+func TestDetailViewUsesConfiguredPriorityLabel(t *testing.T) {
+	m := testModel()
+	m.config = config.Default()
+	m.config.MYN.HighLabel = "Critical Now"
+	m = selectFirstTask(t, m)
+	m.state = stateDetails
+
+	view := m.detailView()
+	if !strings.Contains(view, "Priority: Critical Now") {
+		t.Fatalf("detailView() missing configured priority label: %q", view)
+	}
+}
+
 func TestTaskViewDoesNotShowPriorityWarningForAllContexts(t *testing.T) {
 	m := testModel()
 	m.config = config.Config{MYN: config.MYNConfig{CriticalNowMaxTasks: 1, OpportunityNowMaxTasks: 1}}

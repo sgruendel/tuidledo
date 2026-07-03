@@ -1143,6 +1143,29 @@ func (m Model) priorityMaxTasks(priority int) int {
 	}
 }
 
+func (m Model) priorityLabel(priority int) string {
+	defaultLabel := myn.PriorityLabel(priority)
+	switch priority {
+	case 3:
+		if m.config.MYN.TopLabel != "" {
+			return m.config.MYN.TopLabel
+		}
+	case 2:
+		if m.config.MYN.HighLabel != "" {
+			return m.config.MYN.HighLabel
+		}
+	case 1:
+		if m.config.MYN.MedLabel != "" {
+			return m.config.MYN.MedLabel
+		}
+	case 0:
+		if m.config.MYN.LowLabel != "" {
+			return m.config.MYN.LowLabel
+		}
+	}
+	return defaultLabel
+}
+
 func priorityIn(priority int, priorities []int) bool {
 	for _, candidate := range priorities {
 		if candidate == priority {
@@ -1203,7 +1226,7 @@ func (m Model) taskView() string {
 				if rowIndex > 0 && listRow.priority != lastPriority {
 					b.WriteByte('\n')
 				}
-				header := myn.PriorityLabel(listRow.priority)
+				header := m.priorityLabel(listRow.priority)
 				if warning, ok := m.priorityWarning(listRow.priority, base); ok {
 					header += fmt.Sprintf(" (warning: %d/%d)", warning.count, warning.max)
 				}
@@ -1256,7 +1279,7 @@ func (m Model) detailView() string {
 		return m.taskView()
 	}
 	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nPriority: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), myn.PriorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), m.priorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
 }
 
 func (m Model) editView() string {
@@ -1273,7 +1296,7 @@ func (m Model) editView() string {
 		m.titleInput.View(),
 		m.noteInput.View(),
 		priorityMarker,
-		myn.PriorityLabel(m.editPriority),
+		m.priorityLabel(m.editPriority),
 		m.dateFieldView(editFieldStart, m.startPicker),
 		m.dateFieldView(editFieldDue, m.duePicker),
 		contextMarker,

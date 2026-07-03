@@ -35,7 +35,7 @@ func TestLoadReadsTOMLAndAppliesDefaultsForMissingValues(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte("[myn]\nopportunity_now_max_tasks = 12\n")
+	data := []byte("[myn]\nopportunity_now_max_tasks = 12\nhigh_label = \"Critical Now\"\nmed_label = \"Opportunity Now\"\n")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +49,15 @@ func TestLoadReadsTOMLAndAppliesDefaultsForMissingValues(t *testing.T) {
 	}
 	if cfg.MYN.OpportunityNowMaxTasks != 12 {
 		t.Fatalf("OpportunityNowMaxTasks = %d, want 12", cfg.MYN.OpportunityNowMaxTasks)
+	}
+	if cfg.MYN.HighLabel != "Critical Now" {
+		t.Fatalf("HighLabel = %q, want Critical Now", cfg.MYN.HighLabel)
+	}
+	if cfg.MYN.MedLabel != "Opportunity Now" {
+		t.Fatalf("MedLabel = %q, want Opportunity Now", cfg.MYN.MedLabel)
+	}
+	if cfg.MYN.TopLabel != "Top" {
+		t.Fatalf("TopLabel = %q, want Top", cfg.MYN.TopLabel)
 	}
 }
 

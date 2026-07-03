@@ -138,7 +138,14 @@ Configure those limits in `config.toml`:
 [myn]
 critical_now_max_tasks = 5
 opportunity_now_max_tasks = 20
+top_label = "Top"
+high_label = "Critical Now"
+med_label = "Opportunity Now"
+low_label = "Over the Horizon"
 ```
+
+The priority labels are optional. If omitted, tuidledo uses `Top`, `High`, `Med`,
+and `Low`.
 
 `config.toml` lives in your user config directory:
 

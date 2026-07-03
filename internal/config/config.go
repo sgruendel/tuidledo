@@ -21,6 +21,10 @@ type Config struct {
 type MYNConfig struct {
 	CriticalNowMaxTasks    int `toml:"critical_now_max_tasks"`
 	OpportunityNowMaxTasks int `toml:"opportunity_now_max_tasks"`
+	TopLabel               string `toml:"top_label"`
+	HighLabel              string `toml:"high_label"`
+	MedLabel               string `toml:"med_label"`
+	LowLabel               string `toml:"low_label"`
 }
 
 func Load() (Config, error) {
@@ -49,6 +53,10 @@ func Default() Config {
 		MYN: MYNConfig{
 			CriticalNowMaxTasks:    defaultCriticalNowMaxTasks,
 			OpportunityNowMaxTasks: defaultOpportunityNowMaxTasks,
+			TopLabel:               "Top",
+			HighLabel:              "High",
+			MedLabel:               "Med",
+			LowLabel:               "Low",
 		},
 	}
 }
@@ -67,6 +75,18 @@ func (cfg Config) withDefaults() Config {
 	}
 	if cfg.MYN.OpportunityNowMaxTasks <= 0 {
 		cfg.MYN.OpportunityNowMaxTasks = defaultOpportunityNowMaxTasks
+	}
+	if cfg.MYN.TopLabel == "" {
+		cfg.MYN.TopLabel = "Top"
+	}
+	if cfg.MYN.HighLabel == "" {
+		cfg.MYN.HighLabel = "High"
+	}
+	if cfg.MYN.MedLabel == "" {
+		cfg.MYN.MedLabel = "Med"
+	}
+	if cfg.MYN.LowLabel == "" {
+		cfg.MYN.LowLabel = "Low"
 	}
 	return cfg
 }
