@@ -24,7 +24,7 @@ repeat editing, file attachment management, or non-MYN list modes.
 ## Setup
 
 Prebuilt release binaries can embed the shared Toodledo OAuth client credentials.
-Locally, `config.json` stores only access tokens, refresh tokens, token expiry, and
+Locally, `state.json` stores only access tokens, refresh tokens, token expiry, and
 the last selected context.
 
 Register an app with Toodledo and configure this redirect URI:
@@ -101,8 +101,11 @@ That tag run uploads workflow artifacts and publishes the packaged binaries plus
 their checksum files as GitHub release assets.
 
 On first launch, open the printed authorization URL and approve access. Tokens
-and the last selected context are stored in your user config directory as
-`tuidledo/config.json`.
+and the last selected context are stored in:
+
+- Linux: `$XDG_STATE_HOME/tuidledo/state.json`, or `~/.local/state/tuidledo/state.json`
+- macOS: `~/Library/Application Support/tuidledo/state.json`
+- Windows: `%LOCALAPPDATA%\tuidledo\state.json`
 
 ## MYN Filtering
 
