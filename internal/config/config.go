@@ -19,8 +19,8 @@ type Config struct {
 }
 
 type MYNConfig struct {
-	CriticalNowMaxTasks    int `toml:"critical_now_max_tasks"`
-	OpportunityNowMaxTasks int `toml:"opportunity_now_max_tasks"`
+	CriticalNowMaxTasks    int    `toml:"critical_now_max_tasks"`
+	OpportunityNowMaxTasks int    `toml:"opportunity_now_max_tasks"`
 	TopLabel               string `toml:"top_label"`
 	HighLabel              string `toml:"high_label"`
 	MedLabel               string `toml:"med_label"`
