@@ -2,7 +2,8 @@
 
 [![build](https://github.com/sgruendel/tuidledo/actions/workflows/go.yml/badge.svg)](https://github.com/sgruendel/tuidledo/actions/workflows/go.yml)
 
-Go TUI client for Toodledo, focused on a Master Your Now style task list.
+Go TUI client for [Toodledo](https://www.toodledo.com/), focused on a
+[Master Your Now](https://www.michaellinenberger.com/AboutMYN.html) style task list.
 
 ## Status
 
@@ -16,7 +17,8 @@ feature coverage. It supports:
 - Task creation with MYN defaults
 - Task completion
 - Task deletion with confirmation
-- Task details and editing for title, note, priority, start date, due date, and context
+- Task details and editing for title, note, priority, start date, due date,
+  and context
 
 Not currently supported: folders, goals, tags, subtasks, saved searches, full
 repeat editing, file attachment management, or non-MYN list modes.
@@ -82,7 +84,8 @@ go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X
 The GitHub Actions workflow does three things:
 
 - runs formatting, tests, and a normal build on pushes and pull requests
-- builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64, and macOS arm64 on tags like `v0.1.0`
+- builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64,
+  and macOS arm64 on tags like `v0.1.0`
 - publishes a matching `.sha256` checksum file for each release archive
 
 To enable release builds, add these repository secrets:
@@ -141,7 +144,10 @@ New tasks use the current context, medium priority, and today's start date.
 - `q`: back, or quit from the task list
 - `ctrl+c`: quit
 
-In the edit form, `tab` / `shift+tab` switches between fields, `ctrl+s` saves, and `esc` cancels. Priority and context fields cycle with `[` / `]` or `enter`. Date fields use `h` / `j` / `k` / `l`, `H` / `L` for months, `enter` to select, and `x` to clear.
+In the edit form, `tab` / `shift+tab` switches between fields, `ctrl+s` saves,
+and `esc` cancels. Priority and context fields cycle with `[` / `]` or `enter`.
+Date fields use `h` / `j` / `k` / `l`, `H` / `L` for months, `enter` to
+select, and `x` to clear.
 
 ## tmux Hyperlinks
 
