@@ -207,12 +207,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateTasks
 		m.message = "Created task"
 		m.refreshVisible()
-		for i, task := range m.visible {
-			if task.ID == msg.task.ID {
-				m.cursor = i
-				break
-			}
-		}
+		m.selectTaskByID(msg.task.ID)
 		return m, nil
 	case editMsg:
 		if msg.err != nil {
@@ -226,12 +221,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.message = "Updated task"
 		m.clearEditForm()
 		m.refreshVisible()
-		for i, task := range m.visible {
-			if task.ID == msg.task.ID {
-				m.cursor = i
-				break
-			}
-		}
+		m.selectTaskByID(msg.task.ID)
 		return m, nil
 	case tea.PasteMsg:
 		return m.handlePaste(msg)
@@ -1059,6 +1049,16 @@ func (m Model) currentTask() *toodledo.Task {
 		return nil
 	}
 	return m.rows[m.cursor].task
+}
+
+func (m *Model) selectTaskByID(taskID int64) {
+	for i, row := range m.rows {
+		if row.task != nil && row.task.ID == taskID {
+			m.cursor = i
+			m.updateActivePriorityFromCursor()
+			return
+		}
+	}
 }
 
 func (m *Model) toggleActivePriority() {

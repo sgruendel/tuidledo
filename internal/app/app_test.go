@@ -257,6 +257,17 @@ func TestCreatedTaskValuesIncludeNote(t *testing.T) {
 	}
 }
 
+func TestCreateMsgSelectsCreatedTaskRow(t *testing.T) {
+	m := testModel()
+
+	model, _ := m.Update(createMsg{task: toodledo.Task{ID: 4, Title: "created medium", Priority: 1, Context: 20}})
+	updated := model.(Model)
+
+	if task := updated.currentTask(); task == nil || task.ID != 4 {
+		t.Fatalf("currentTask after create = %#v, want created task 4", task)
+	}
+}
+
 func TestEditFormInitializesFromDetails(t *testing.T) {
 	m := testModel()
 	m.tasks[0].Note = "old note"
@@ -374,6 +385,20 @@ func TestEditMsgUpdatesTask(t *testing.T) {
 	updated := model.(Model)
 	if updated.tasks[0].Title != "updated" || updated.tasks[0].Note != "new note" || updated.tasks[0].Context != 20 || updated.tasks[0].Priority != 3 {
 		t.Fatalf("updated task = %#v", updated.tasks[0])
+	}
+}
+
+func TestEditMsgSelectsUpdatedTaskRow(t *testing.T) {
+	m := testModel()
+
+	model, _ := m.Update(editMsg{task: toodledo.Task{ID: 3, Title: "updated medium", Priority: 1, Context: 20}})
+	updated := model.(Model)
+
+	if updated.state != stateDetails {
+		t.Fatalf("state after edit = %v, want stateDetails", updated.state)
+	}
+	if task := updated.currentTask(); task == nil || task.ID != 3 {
+		t.Fatalf("currentTask after edit = %#v, want task 3", task)
 	}
 }
 
