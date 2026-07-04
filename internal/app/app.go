@@ -1356,14 +1356,15 @@ func (m Model) helpView() string {
 j/k, arrows       move selection
 g/G               jump to top/bottom
 tab/shift+tab     jump between priority groups
-.                 collapse/expand active priority group
+./,               jump between priority groups
+h/l               collapse/expand active priority group
 [ / ]             switch context
 /                 search visible task titles
 n                 create new task in current context
 d                 mark selected task done
 D                 ask to delete selected task
 e                 edit task from details
-enter             show task details
+enter             show details or toggle priority header
 r                 refresh from Toodledo
 esc               back or clear search
 q                 back, or quit from task list
