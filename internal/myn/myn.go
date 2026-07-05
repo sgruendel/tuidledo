@@ -93,6 +93,13 @@ func IsToday(unix int64, now time.Time) bool {
 	return dayStart(time.Unix(unix, 0).UTC()).Equal(dayStart(now.UTC()))
 }
 
+func IsPastDate(unix int64, now time.Time) bool {
+	if unix == 0 {
+		return false
+	}
+	return dayStart(time.Unix(unix, 0).UTC()).Before(dayStart(now.UTC()))
+}
+
 func dayStart(t time.Time) time.Time {
 	y, m, d := t.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)

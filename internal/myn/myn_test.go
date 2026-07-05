@@ -90,6 +90,22 @@ func TestIsToday(t *testing.T) {
 	}
 }
 
+func TestIsPastDate(t *testing.T) {
+	now := time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC)
+	if !IsPastDate(toodledo.NoonUnix(now.AddDate(0, 0, -1)), now) {
+		t.Fatal("IsPastDate(yesterday) = false, want true")
+	}
+	if IsPastDate(toodledo.NoonUnix(now), now) {
+		t.Fatal("IsPastDate(today) = true, want false")
+	}
+	if IsPastDate(toodledo.NoonUnix(now.AddDate(0, 0, 1)), now) {
+		t.Fatal("IsPastDate(tomorrow) = true, want false")
+	}
+	if IsPastDate(0, now) {
+		t.Fatal("IsPastDate(0) = true, want false")
+	}
+}
+
 func taskIDs(tasks []toodledo.Task) []int64 {
 	ids := make([]int64, 0, len(tasks))
 	for _, task := range tasks {

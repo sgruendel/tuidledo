@@ -1226,19 +1226,7 @@ func (m Model) taskView() string {
 				if rowIndex > 0 && listRow.priority != lastPriority {
 					b.WriteByte('\n')
 				}
-				header := m.priorityLabel(listRow.priority)
-				if warning, ok := m.priorityWarning(listRow.priority, base); ok {
-					header += fmt.Sprintf(" (warning: %d/%d)", warning.count, warning.max)
-				}
-				if m.collapsedPriorities[listRow.priority] {
-					header += " (collapsed)"
-				}
-				if rowIndex == m.cursor {
-					header = "> " + header
-				} else {
-					header = "  " + header
-				}
-				b.WriteString(priorityHeaderStyle.Render(fmt.Sprintf("%-48s  %-10s  %-10s  %-18s", header, "Start", "Due", "Repeat")))
+				b.WriteString(m.priorityHeaderView(listRow.priority, base, rowIndex == m.cursor))
 				b.WriteByte('\n')
 				lastPriority = listRow.priority
 				continue
@@ -1257,7 +1245,9 @@ func (m Model) taskView() string {
 			}
 			b.WriteString(style.Render(cursor))
 			b.WriteString(titleStyle.Render(fmt.Sprintf("%-46s", task.Title)))
-			b.WriteString(style.Render(fmt.Sprintf("  %-10s  %-10s  %-18s", myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat))))
+			b.WriteString(style.Render(fmt.Sprintf("  %-10s  ", myn.DateLabel(task.StartDate))))
+			b.WriteString(dueDateStyle(task.DueDate, style).Render(fmt.Sprintf("%-10s", myn.DateLabel(task.DueDate))))
+			b.WriteString(style.Render(fmt.Sprintf("  %-18s", myn.RepeatLabel(task.Repeat))))
 			b.WriteByte('\n')
 			row++
 		}
@@ -1279,7 +1269,7 @@ func (m Model) detailView() string {
 		return m.taskView()
 	}
 	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nPriority: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
-		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), m.priorityLabel(task.Priority), myn.DateLabel(task.StartDate), myn.DateLabel(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
+		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), m.priorityLabel(task.Priority), myn.DateLabel(task.StartDate), dueDateText(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
 }
 
 func (m Model) editView() string {
@@ -1314,6 +1304,36 @@ func (m Model) dateFieldView(field editField, picker datepicker.Model) string {
 		return fmt.Sprintf("%s %s", marker, label)
 	}
 	return fmt.Sprintf("%s %s\n%s", marker, label, picker.View())
+}
+
+func (m Model) priorityHeaderView(priority int, base []toodledo.Task, selected bool) string {
+	header := m.priorityLabel(priority)
+	if selected {
+		header = "> " + header
+	} else {
+		header = "  " + header
+	}
+
+	warningText := ""
+	if warning, ok := m.priorityWarning(priority, base); ok {
+		warningText = fmt.Sprintf(" (warning: %d/%d)", warning.count, warning.max)
+	}
+
+	collapsedText := ""
+	if m.collapsedPriorities[priority] {
+		collapsedText = " (collapsed)"
+	}
+
+	headerWidth := lipgloss.Width(header) + lipgloss.Width(warningText) + lipgloss.Width(collapsedText)
+	padding := ""
+	if headerWidth < 48 {
+		padding = strings.Repeat(" ", 48-headerWidth)
+	}
+
+	return priorityHeaderStyle.Render(header) +
+		errorStyle.Render(warningText) +
+		priorityHeaderStyle.Render(collapsedText+padding) +
+		priorityHeaderStyle.Render(fmt.Sprintf("  %-10s  %-10s  %-18s", "Start", "Due", "Repeat"))
 }
 
 func (m Model) createView() string {
@@ -1478,6 +1498,17 @@ func taskRowStyle(row int) lipgloss.Style {
 		return zebraStyle
 	}
 	return lipgloss.NewStyle()
+}
+
+func dueDateStyle(unix int64, base lipgloss.Style) lipgloss.Style {
+	if myn.IsPastDate(unix, time.Now()) {
+		return base.Foreground(lipgloss.Color("196"))
+	}
+	return base
+}
+
+func dueDateText(unix int64) string {
+	return dueDateStyle(unix, lipgloss.NewStyle()).Render(myn.DateLabel(unix))
 }
 
 var (

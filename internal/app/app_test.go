@@ -1,11 +1,13 @@
 package app
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/sgruendel/tuidledo/internal/config"
 	"github.com/sgruendel/tuidledo/internal/toodledo"
@@ -132,8 +134,11 @@ func TestTaskViewShowsPriorityWarningForSingleContext(t *testing.T) {
 	m.refreshVisible()
 
 	view := m.taskView()
-	if !strings.Contains(view, "High (warning: 2/1)") {
+	if !strings.Contains(stripANSI(view), "High (warning: 2/1)") {
 		t.Fatalf("taskView() missing single-context warning: %q", view)
+	}
+	if !strings.Contains(view, errorStyle.Render(" (warning: 2/1)")) {
+		t.Fatalf("taskView() missing red warning: %q", view)
 	}
 }
 
@@ -162,6 +167,22 @@ func TestDetailViewUsesConfiguredPriorityLabel(t *testing.T) {
 	view := m.detailView()
 	if !strings.Contains(view, "Priority: Critical Now") {
 		t.Fatalf("detailView() missing configured priority label: %q", view)
+	}
+}
+
+func TestDueDateStyleMarksPastDatesRed(t *testing.T) {
+	base := lipgloss.NewStyle().Foreground(lipgloss.Color("229"))
+	past := toodledo.NoonUnix(time.Now().AddDate(0, 0, -1))
+	today := toodledo.NoonUnix(time.Now())
+
+	if got, want := dueDateStyle(past, base).GetForeground(), lipgloss.Color("196"); got != want {
+		t.Fatalf("past due foreground = %v, want %v", got, want)
+	}
+	if got, want := dueDateStyle(today, base).GetForeground(), lipgloss.Color("229"); got != want {
+		t.Fatalf("today due foreground = %v, want %v", got, want)
+	}
+	if got, want := dueDateStyle(0, base).GetForeground(), lipgloss.Color("229"); got != want {
+		t.Fatalf("empty due foreground = %v, want %v", got, want)
 	}
 }
 
@@ -565,3 +586,9 @@ func keyPress(key string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: code, Text: key}
 	}
 }
+
+func stripANSI(value string) string {
+	return ansiRE.ReplaceAllString(value, "")
+}
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
