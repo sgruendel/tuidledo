@@ -8,6 +8,7 @@ import (
 	"github.com/sgruendel/tuidledo/internal/toodledo"
 )
 
+// VisibleTasks filters and sorts tasks for the MYN task list.
 func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time.Time) []toodledo.Task {
 	today := toodledo.NoonUnix(now)
 	query = strings.ToLower(strings.TrimSpace(query))
@@ -49,6 +50,7 @@ func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time
 	return visible
 }
 
+// PriorityLabel returns the short display label for a Toodledo priority.
 func PriorityLabel(priority int) string {
 	switch priority {
 	case 3:
@@ -64,10 +66,12 @@ func PriorityLabel(priority int) string {
 	}
 }
 
+// DateLabel returns a relative display label for a Unix timestamp.
 func DateLabel(unix int64) string {
 	return DateLabelAt(unix, time.Now())
 }
 
+// DateLabelAt returns a relative display label for a Unix timestamp at now.
 func DateLabelAt(unix int64, now time.Time) string {
 	if unix == 0 {
 		return "-"
@@ -86,6 +90,7 @@ func DateLabelAt(unix int64, now time.Time) string {
 	}
 }
 
+// IsToday reports whether a Unix timestamp falls on today's UTC date.
 func IsToday(unix int64, now time.Time) bool {
 	if unix == 0 {
 		return false
@@ -93,6 +98,7 @@ func IsToday(unix int64, now time.Time) bool {
 	return dayStart(time.Unix(unix, 0).UTC()).Equal(dayStart(now.UTC()))
 }
 
+// IsPastDate reports whether a Unix timestamp falls before today's UTC date.
 func IsPastDate(unix int64, now time.Time) bool {
 	if unix == 0 {
 		return false

@@ -14,10 +14,12 @@ const (
 	defaultOpportunityNowMaxTasks = 20
 )
 
+// Config contains user-configurable application settings.
 type Config struct {
 	MYN MYNConfig `toml:"myn"`
 }
 
+// MYNConfig contains settings for Michael Linenberger-style task views.
 type MYNConfig struct {
 	CriticalNowMaxTasks    int    `toml:"critical_now_max_tasks"`
 	OpportunityNowMaxTasks int    `toml:"opportunity_now_max_tasks"`
@@ -27,6 +29,7 @@ type MYNConfig struct {
 	LowLabel               string `toml:"low_label"`
 }
 
+// Load reads the application configuration, returning defaults for missing files and values.
 func Load() (Config, error) {
 	cfg := Default()
 	path, err := Path()
@@ -48,6 +51,7 @@ func Load() (Config, error) {
 	return cfg.withDefaults(), nil
 }
 
+// Default returns the default application configuration.
 func Default() Config {
 	return Config{
 		MYN: MYNConfig{
@@ -61,6 +65,7 @@ func Default() Config {
 	}
 }
 
+// Path returns the application configuration file path.
 func Path() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

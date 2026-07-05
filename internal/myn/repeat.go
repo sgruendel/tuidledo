@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// RepeatLabel returns a human-readable label for a Toodledo repeat rule.
 func RepeatLabel(rule string) string {
 	if strings.TrimSpace(rule) == "" {
 		return "-"
@@ -172,6 +173,7 @@ func ordinal(value string) string {
 	return fmt.Sprintf("%d%s", n, suffix)
 }
 
+// KnownRepeatKeys returns the sorted keys present in a repeat rule.
 func KnownRepeatKeys(rule string) []string {
 	parts := parseRepeatRule(rule)
 	keys := make([]string, 0, len(parts))

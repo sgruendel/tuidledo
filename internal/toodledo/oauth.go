@@ -15,6 +15,7 @@ import (
 
 const callbackPath = "/callback"
 
+// AuthResult contains the OAuth authorization callback details.
 type AuthResult struct {
 	Code        string
 	State       string
@@ -22,6 +23,7 @@ type AuthResult struct {
 	RedirectURI string
 }
 
+// WaitForAuthCode starts a local callback server and waits for an OAuth code.
 func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 	state, err := randomState()
 	if err != nil {
@@ -93,6 +95,7 @@ func authorizeURL(clientID, state string) string {
 	return baseURL + "/account/authorize.php?" + values.Encode()
 }
 
+// AuthURL returns the Toodledo OAuth authorization URL.
 func AuthURL(clientID, state string) string {
 	return authorizeURL(clientID, state)
 }

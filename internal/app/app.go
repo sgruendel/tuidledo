@@ -83,6 +83,7 @@ type listRow struct {
 	task     *toodledo.Task
 }
 
+// Model is the Bubble Tea application model.
 type Model struct {
 	clientID            string
 	clientSecret        string
@@ -120,6 +121,7 @@ type priorityWarning struct {
 	max   int
 }
 
+// New returns an initialized application model.
 func New(clientID, clientSecret string) Model {
 	appConfig, configErr := config.Load()
 	st, err := statepkg.Load()
@@ -146,10 +148,12 @@ func New(clientID, clientSecret string) Model {
 	return m
 }
 
+// Init returns the initial Bubble Tea command.
 func (m Model) Init() tea.Cmd {
 	return m.startupCmd()
 }
 
+// Update handles a Bubble Tea message and returns the updated model and command.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -231,6 +235,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// View returns the current Bubble Tea view.
 func (m Model) View() tea.View {
 	return tea.NewView(m.viewString())
 }

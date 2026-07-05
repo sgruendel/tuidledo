@@ -18,6 +18,7 @@ var apiBaseURL = baseURL
 
 const taskFields = "priority,startdate,duedate,repeat,context,note,attachment"
 
+// Client calls the Toodledo API.
 type Client struct {
 	HTTPClient   *http.Client
 	AccessToken  string
@@ -25,14 +26,17 @@ type Client struct {
 	ClientSecret string
 }
 
+// UnauthorizedError reports an unauthorized Toodledo API response.
 type UnauthorizedError struct {
 	Body string
 }
 
+// Error returns the unauthorized response message.
 func (e UnauthorizedError) Error() string {
 	return "toodledo unauthorized: " + e.Body
 }
 
+// NewClient returns a Toodledo API client.
 func NewClient(clientID, clientSecret, accessToken string) *Client {
 	return &Client{
 		HTTPClient:   &http.Client{Timeout: 20 * time.Second},
@@ -42,14 +46,17 @@ func NewClient(clientID, clientSecret, accessToken string) *Client {
 	}
 }
 
+// ExchangeCode exchanges an OAuth authorization code for a token.
 func (c *Client) ExchangeCode(ctx context.Context, code string) (Token, error) {
 	return c.token(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "f": {"json"}})
 }
 
+// RefreshToken exchanges a refresh token for a new access token.
 func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (Token, error) {
 	return c.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "f": {"json"}})
 }
 
+// GetContexts returns the user's Toodledo contexts.
 func (c *Client) GetContexts(ctx context.Context) ([]Context, error) {
 	var raw []json.RawMessage
 	if err := c.get(ctx, "/contexts/get.php", nil, &raw); err != nil {
@@ -70,6 +77,7 @@ func (c *Client) GetContexts(ctx context.Context) ([]Context, error) {
 	return contexts, nil
 }
 
+// GetTasks returns incomplete tasks with the fields used by the application.
 func (c *Client) GetTasks(ctx context.Context) ([]Task, error) {
 	params := url.Values{}
 	params.Set("comp", "0")
@@ -101,6 +109,7 @@ func (c *Client) GetTasks(ctx context.Context) ([]Task, error) {
 	return tasks, nil
 }
 
+// AddTask creates a task in Toodledo.
 func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	payload, err := json.Marshal([]map[string]any{{
 		"title":     task.Title,
@@ -134,6 +143,7 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	return added, nil
 }
 
+// EditTask updates a task in Toodledo.
 func (c *Client) EditTask(ctx context.Context, task Task) (Task, error) {
 	payload, err := json.Marshal([]map[string]any{{
 		"id":        task.ID,
@@ -169,6 +179,7 @@ func (c *Client) EditTask(ctx context.Context, task Task) (Task, error) {
 	return edited, nil
 }
 
+// CompleteTask marks a task complete and lets Toodledo reschedule repeating tasks.
 func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt time.Time) error {
 	payload, err := json.Marshal([]map[string]any{{"id": taskID, "completed": NoonUnix(completedAt)}})
 	if err != nil {
@@ -192,6 +203,7 @@ func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt tim
 	return nil
 }
 
+// DeleteTask deletes a task from Toodledo.
 func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
 	payload, err := json.Marshal([]int64{taskID})
 	if err != nil {

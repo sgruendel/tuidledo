@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Token is an OAuth token response from Toodledo.
 type Token struct {
 	AccessToken  string `json:"access_token"`
 	ExpiresIn    int    `json:"expires_in"`
@@ -13,11 +14,13 @@ type Token struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// Context is a Toodledo context.
 type Context struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
 }
 
+// Task is a Toodledo task.
 type Task struct {
 	ID         int64        `json:"id"`
 	Title      string       `json:"title"`
@@ -32,6 +35,7 @@ type Task struct {
 	Attachment []Attachment `json:"attachment"`
 }
 
+// UnmarshalJSON decodes a task and normalizes Toodledo's attachment variants.
 func (t *Task) UnmarshalJSON(data []byte) error {
 	type taskAlias Task
 	var raw struct {
@@ -50,17 +54,20 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(raw.Attachment, &t.Attachment)
 }
 
+// Attachment is a Toodledo task attachment.
 type Attachment struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 }
 
+// APIError is an error object returned by the Toodledo API.
 type APIError struct {
 	ErrorCode int    `json:"errorCode"`
 	ErrorDesc string `json:"errorDesc"`
 	Ref       string `json:"ref"`
 }
 
+// NoonUnix returns the Unix timestamp for noon UTC on t's date.
 func NoonUnix(t time.Time) int64 {
 	y, m, d := t.UTC().Date()
 	return time.Date(y, m, d, 12, 0, 0, 0, time.UTC).Unix()

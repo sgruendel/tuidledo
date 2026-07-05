@@ -12,6 +12,7 @@ import (
 
 const appDirName = "tuidledo"
 
+// State contains locally persisted authentication and UI state.
 type State struct {
 	AccessToken   string    `json:"access_token"`
 	RefreshToken  string    `json:"refresh_token"`
@@ -19,6 +20,7 @@ type State struct {
 	LastContextID int64     `json:"last_context_id"`
 }
 
+// Load reads the persisted state, migrating legacy config state when needed.
 func Load() (State, error) {
 	path, err := Path()
 	if err != nil {
@@ -54,6 +56,7 @@ func Load() (State, error) {
 
 }
 
+// Save writes the persisted state.
 func Save(st State) error {
 	path, err := Path()
 	if err != nil {
@@ -62,6 +65,7 @@ func Save(st State) error {
 	return saveToPath(path, st)
 }
 
+// Path returns the platform-specific state file path.
 func Path() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
