@@ -157,7 +157,7 @@ func TestTaskViewUsesConfiguredPriorityLabels(t *testing.T) {
 	}
 }
 
-func TestDetailViewUsesConfiguredPriorityLabel(t *testing.T) {
+func TestDetailViewUsesConfiguredUrgencyLabel(t *testing.T) {
 	m := testModel()
 	m.config = config.Default()
 	m.config.MYN.HighLabel = "Critical Now"
@@ -165,8 +165,8 @@ func TestDetailViewUsesConfiguredPriorityLabel(t *testing.T) {
 	m.state = stateDetails
 
 	view := m.detailView()
-	if !strings.Contains(view, "Priority: Critical Now") {
-		t.Fatalf("detailView() missing configured priority label: %q", view)
+	if !strings.Contains(view, "Urgency: Critical Now") {
+		t.Fatalf("detailView() missing configured urgency label: %q", view)
 	}
 }
 
@@ -260,6 +260,39 @@ func TestCreateFormEnterOnNoteAddsNewline(t *testing.T) {
 	}
 	if m.state != stateCreate {
 		t.Fatalf("state after enter in note = %v, want stateCreate", m.state)
+	}
+}
+
+func TestCreateViewUsesSelectedUrgencyLabel(t *testing.T) {
+	m := testModel()
+	m.config = config.Default()
+	m.config.MYN.HighLabel = "Critical Now"
+	m.startCreateForm()
+
+	view := m.createView()
+	if !strings.Contains(view, "Urgency: Critical Now") {
+		t.Fatalf("createView() missing configured urgency label: %q", view)
+	}
+}
+
+func TestNewTaskUsesSelectedUrgency(t *testing.T) {
+	m := testModel()
+	m.activePriority = 2
+
+	task := m.newTask("new task", "new note", time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC))
+	if task.Priority != 2 {
+		t.Fatalf("new task priority = %d, want selected priority 2", task.Priority)
+	}
+}
+
+func TestNewTaskDefaultsToMediumUrgencyWithoutSelection(t *testing.T) {
+	m := testModel()
+	m.tasks = nil
+	m.refreshVisible()
+
+	task := m.newTask("new task", "", time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC))
+	if task.Priority != 1 {
+		t.Fatalf("new task priority = %d, want default priority 1", task.Priority)
 	}
 }
 

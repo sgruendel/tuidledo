@@ -17,7 +17,7 @@ feature coverage. It supports:
 - Task creation with MYN defaults
 - Task completion
 - Task deletion with confirmation
-- Task details and editing for title, note, priority, start date, due date,
+- Task details and editing for title, note, urgency, start date, due date,
   and context
 
 Not currently supported: folders, goals, tags, subtasks, saved searches, full
@@ -121,16 +121,17 @@ The task list hides:
 - negative-priority tasks
 - tasks with a future start date
 
-Visible tasks are sorted by priority first, then start date descending within
-each priority group.
+Visible tasks are sorted by Toodledo priority first, then start date descending
+within each urgency zone.
 
-New tasks use the current context, medium priority, and today's start date.
+New tasks use the current context, medium urgency, and today's start date.
 
 When you are viewing a single context, tuidledo shows a warning next to the
-priority label if the context exceeds the configured MYN limit for that priority:
+urgency label if the context exceeds the configured MYN limit for that mapped
+Toodledo priority:
 
-- High priority (Critical Now): default max 5 tasks
-- Med priority (Opportunity Now): default max 20 tasks
+- Toodledo High priority (Critical Now): default max 5 tasks
+- Toodledo Med priority (Opportunity Now): default max 20 tasks
 
 Configure those limits in `config.toml`:
 
@@ -144,8 +145,8 @@ med_label = "Opportunity Now"
 low_label = "Over the Horizon"
 ```
 
-The priority labels are optional. If omitted, tuidledo uses `Top`, `High`, `Med`,
-and `Low`.
+The urgency labels are optional. If omitted, tuidledo uses `Top`, `High`, `Med`,
+and `Low` for the mapped Toodledo priorities.
 
 `config.toml` lives in your user config directory:
 
@@ -157,10 +158,10 @@ and `Low`.
 
 - `j` / `k` or arrows: move selection
 - `g` / `G`: jump to top/bottom
-- `.` / `,`: jump to next/previous priority group
+- `.` / `,`: jump to next/previous urgency zone
 - `tab` / `shift+tab`: same as `.` / `,`
-- `h` / `l`: collapse/expand active priority group
-- `enter`: expand/collapse priority header or open selected task details
+- `h` / `l`: collapse/expand active urgency zone
+- `enter`: expand/collapse urgency header or open selected task details
 - `[` / `]`: switch context
 - `/`: search visible task titles
 - `n`: create new task in the current context
@@ -175,7 +176,7 @@ and `Low`.
 - `ctrl+c`: quit
 
 In the edit form, `tab` / `shift+tab` switches between fields, `ctrl+s` saves,
-and `esc` cancels. Priority and context fields cycle with `[` / `]` or `enter`.
+and `esc` cancels. Urgency and context fields cycle with `[` / `]` or `enter`.
 Date fields use `h` / `j` / `k` / `l`, `H` / `L` for months, `enter` to
 select, and `x` to clear.
 

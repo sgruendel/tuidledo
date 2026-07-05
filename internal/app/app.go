@@ -595,13 +595,7 @@ func (m Model) createCmd(title, note string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		task := toodledo.Task{
-			Title:     title,
-			Note:      note,
-			Priority:  1,
-			StartDate: toodledo.NoonUnix(time.Now()),
-			Context:   m.currentContextID(),
-		}
+		task := m.newTask(title, note, time.Now())
 		var created toodledo.Task
 		st, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
 			var err error
@@ -610,6 +604,23 @@ func (m Model) createCmd(title, note string) tea.Cmd {
 		})
 		return createMsg{task: created, st: st, err: err}
 	}
+}
+
+func (m Model) newTask(title, note string, now time.Time) toodledo.Task {
+	return toodledo.Task{
+		Title:     title,
+		Note:      note,
+		Priority:  m.createPriority(),
+		StartDate: toodledo.NoonUnix(now),
+		Context:   m.currentContextID(),
+	}
+}
+
+func (m Model) createPriority() int {
+	if priorityIn(m.activePriority, m.priorityGroups()) {
+		return m.activePriority
+	}
+	return 1
 }
 
 func (m Model) createdTaskValues() (string, string, error) {
@@ -1263,7 +1274,7 @@ func (m Model) taskView() string {
 		b.WriteString(subtleStyle.Render(m.message))
 		b.WriteString("\n")
 	}
-	b.WriteString(helpStyle.Render("j/k move | n new | d done | D delete | h/l fold | ,/. priority | [ ] context | / search | enter details | r refresh | ? help | q quit"))
+	b.WriteString(helpStyle.Render("j/k move | n new | d done | D delete | h/l fold | ,/. urgency | [ ] context | / search | enter details | r refresh | ? help | q quit"))
 	b.WriteByte('\n')
 	return b.String()
 }
@@ -1273,7 +1284,7 @@ func (m Model) detailView() string {
 	if task == nil {
 		return m.taskView()
 	}
-	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nPriority: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
+	return fmt.Sprintf("%s\n\n%s\n\nNote:\n%s\n\nUrgency: %s\nStart: %s\nDue: %s\nRepeat: %s\nContext: %s\n\nAttachments:\n%s\n\n%s\n",
 		titleStyle.Render("Task"), task.Title, linkURLs(emptyDash(task.Note)), m.priorityLabel(task.Priority), myn.DateLabel(task.StartDate), dueDateText(task.DueDate), myn.RepeatLabel(task.Repeat), m.contextNameByID(task.Context), attachmentList(task.Attachment), helpStyle.Render("e edit | d complete | D delete | esc/q back"))
 }
 
@@ -1286,7 +1297,7 @@ func (m Model) editView() string {
 	if m.editField == editFieldContext {
 		contextMarker = ">"
 	}
-	return fmt.Sprintf("%s\n\nTitle\n%s\n\nNote\n%s\n\nPriority\n%s %s\n\nStart\n%s\n\nDue\n%s\n\nContext\n%s %s\n\n%s\n",
+	return fmt.Sprintf("%s\n\nTitle\n%s\n\nNote\n%s\n\nUrgency\n%s %s\n\nStart\n%s\n\nDue\n%s\n\nContext\n%s %s\n\n%s\n",
 		titleStyle.Render("Edit Task"),
 		m.titleInput.View(),
 		m.noteInput.View(),
@@ -1346,9 +1357,10 @@ func (m Model) createView() string {
 	if m.message != "" {
 		message = subtleStyle.Render(m.message) + "\n\n"
 	}
-	return fmt.Sprintf("%s\n\nContext: %s\nPriority: Med\nStart: %s\n\nTitle\n%s\n\nNote\n%s\n\n%s%s\n",
+	return fmt.Sprintf("%s\n\nContext: %s\nUrgency: %s\nStart: %s\n\nTitle\n%s\n\nNote\n%s\n\n%s%s\n",
 		titleStyle.Render("New Task"),
 		m.contextName(),
+		m.priorityLabel(m.createPriority()),
 		myn.DateLabel(toodledo.NoonUnix(time.Now())),
 		m.titleInput.View(),
 		m.noteInput.View(),
@@ -1380,16 +1392,16 @@ func (m Model) helpView() string {
 
 j/k, arrows       move selection
 g/G               jump to top/bottom
-tab/shift+tab     jump between priority groups
-./,               jump between priority groups
-h/l               collapse/expand active priority group
+tab/shift+tab     jump between urgency zones
+./,               jump between urgency zones
+h/l               collapse/expand active urgency zone
 [ / ]             switch context
 /                 search visible task titles
 n                 create new task in current context
 d                 mark selected task done
 D                 ask to delete selected task
 e                 edit task from details
-enter             show details or toggle priority header
+enter             show details or toggle urgency header
 r                 refresh from Toodledo
 esc               back or clear search
 q                 back, or quit from task list
@@ -1399,7 +1411,7 @@ Create form: tab/shift+tab switches fields, enter creates from title, ctrl+s cre
 Enter in the note field inserts a newline.
 
 Edit form: tab/shift+tab switches fields, ctrl+s saves, esc cancels.
-Priority and context fields cycle with [ ], or enter.
+Urgency and context fields cycle with [ ], or enter.
 Date fields use h/j/k/l, H/L for months, enter to select, x to clear.
 
 Register redirect URI: http://127.0.0.1:8765/callback
