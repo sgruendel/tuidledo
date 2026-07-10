@@ -200,17 +200,17 @@ func TestDetailViewUsesConfiguredUrgencyLabel(t *testing.T) {
 }
 
 func TestDueDateStyleMarksPastDatesRed(t *testing.T) {
-	base := lipgloss.NewStyle().Foreground(lipgloss.Color("229"))
+	base := lipgloss.NewStyle().Foreground(mochaText)
 	past := toodledo.NoonUnix(time.Now().AddDate(0, 0, -1))
 	today := toodledo.NoonUnix(time.Now())
 
-	if got, want := dueDateStyle(past, base).GetForeground(), lipgloss.Color("196"); got != want {
+	if got, want := dueDateStyle(past, base).GetForeground(), mochaRed; got != want {
 		t.Fatalf("past due foreground = %v, want %v", got, want)
 	}
-	if got, want := dueDateStyle(today, base).GetForeground(), lipgloss.Color("229"); got != want {
+	if got, want := dueDateStyle(today, base).GetForeground(), mochaText; got != want {
 		t.Fatalf("today due foreground = %v, want %v", got, want)
 	}
-	if got, want := dueDateStyle(0, base).GetForeground(), lipgloss.Color("229"); got != want {
+	if got, want := dueDateStyle(0, base).GetForeground(), mochaText; got != want {
 		t.Fatalf("empty due foreground = %v, want %v", got, want)
 	}
 }

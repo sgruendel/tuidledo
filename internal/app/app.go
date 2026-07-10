@@ -1534,7 +1534,7 @@ func taskRowStyle(row int) lipgloss.Style {
 
 func dueDateStyle(unix int64, base lipgloss.Style) lipgloss.Style {
 	if myn.IsPastDate(unix, time.Now()) {
-		return base.Foreground(lipgloss.Color("196"))
+		return base.Foreground(mochaRed)
 	}
 	return base
 }
@@ -1544,11 +1544,20 @@ func dueDateText(unix int64) string {
 }
 
 var (
-	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	subtleStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-	helpStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	priorityHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("111"))
-	zebraStyle          = lipgloss.NewStyle().Background(lipgloss.Color("235"))
-	selectedStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("229")).Background(lipgloss.Color("238"))
+	mochaMauve    = lipgloss.Color("#cba6f7")
+	mochaRed      = lipgloss.Color("#f38ba8")
+	mochaBlue     = lipgloss.Color("#89b4fa")
+	mochaText     = lipgloss.Color("#cdd6f4")
+	mochaOverlay1 = lipgloss.Color("#7f849c")
+	mochaOverlay0 = lipgloss.Color("#6c7086")
+	mochaSurface2 = lipgloss.Color("#585b70")
+	mochaSurface0 = lipgloss.Color("#313244")
+
+	titleStyle          = lipgloss.NewStyle().Bold(true).Foreground(mochaMauve)
+	subtleStyle         = lipgloss.NewStyle().Foreground(mochaOverlay1)
+	helpStyle           = lipgloss.NewStyle().Foreground(mochaOverlay0)
+	errorStyle          = lipgloss.NewStyle().Foreground(mochaRed)
+	priorityHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(mochaBlue)
+	zebraStyle          = lipgloss.NewStyle().Background(mochaSurface0)
+	selectedStyle       = lipgloss.NewStyle().Foreground(mochaText).Background(mochaSurface2)
 )
