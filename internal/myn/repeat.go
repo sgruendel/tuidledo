@@ -61,7 +61,7 @@ func RepeatLabel(rule string) string {
 
 func parseRepeatRule(rule string) map[string]string {
 	parts := make(map[string]string)
-	for _, part := range strings.Split(rule, ";") {
+	for part := range strings.SplitSeq(rule, ";") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

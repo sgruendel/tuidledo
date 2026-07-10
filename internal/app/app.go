@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -1183,12 +1184,7 @@ func (m Model) priorityLabel(priority int) string {
 }
 
 func priorityIn(priority int, priorities []int) bool {
-	for _, candidate := range priorities {
-		if candidate == priority {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(priorities, priority)
 }
 
 func (m Model) contextName() string {
