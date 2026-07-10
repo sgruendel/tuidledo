@@ -157,6 +157,35 @@ func TestTaskViewUsesConfiguredPriorityLabels(t *testing.T) {
 	}
 }
 
+func TestTaskViewFitsLongTitlesToWindowWidth(t *testing.T) {
+	m := testModel()
+	m.tasks[0].Title = strings.Repeat("long title ", 20)
+	m.refreshVisible()
+
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = model.(Model)
+	line := taskLineContaining(t, m.taskView(), "long title")
+
+	if got := lipgloss.Width(line); got != 80 {
+		t.Fatalf("task line width = %d, want 80: %q", got, line)
+	}
+	if !strings.Contains(line, "...") {
+		t.Fatalf("task line does not contain truncation marker: %q", line)
+	}
+}
+
+func TestTaskViewCapsWidthAt140Columns(t *testing.T) {
+	m := testModel()
+	m.tasks[0].Title = strings.Repeat("wide title ", 20)
+	m.width = 200
+	m.refreshVisible()
+
+	line := taskLineContaining(t, m.taskView(), "wide title")
+	if got := lipgloss.Width(line); got != 140 {
+		t.Fatalf("task line width = %d, want 140: %q", got, line)
+	}
+}
+
 func TestDetailViewUsesConfiguredUrgencyLabel(t *testing.T) {
 	m := testModel()
 	m.config = config.Default()
@@ -622,6 +651,17 @@ func keyPress(key string) tea.KeyPressMsg {
 
 func stripANSI(value string) string {
 	return ansiRE.ReplaceAllString(value, "")
+}
+
+func taskLineContaining(t *testing.T, view, value string) string {
+	t.Helper()
+	for _, line := range strings.Split(view, "\n") {
+		if strings.Contains(line, value) {
+			return line
+		}
+	}
+	t.Fatalf("taskView() has no line containing %q: %q", value, view)
+	return ""
 }
 
 var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)

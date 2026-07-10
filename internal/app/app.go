@@ -14,6 +14,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	datepicker "github.com/ethanefung/bubble-datepicker"
 
 	"github.com/sgruendel/tuidledo/internal/config"
@@ -83,6 +84,13 @@ type listRow struct {
 	priority int
 	task     *toodledo.Task
 }
+
+const (
+	taskCursorWidth      = 2
+	taskListFixedWidth   = taskCursorWidth + 2 + 10 + 2 + 10 + 2 + 18
+	defaultTaskListWidth = 92
+	maxTaskListWidth     = 140
+)
 
 // Model is the Bubble Tea application model.
 type Model struct {
@@ -1218,6 +1226,7 @@ func (m Model) currentContextID() int64 {
 
 func (m Model) taskView() string {
 	var b strings.Builder
+	titleWidth := m.taskTitleWidth()
 	b.WriteString(titleStyle.Render("tuidledo"))
 	b.WriteString("  ")
 	b.WriteString(subtleStyle.Render("context: " + m.contextName()))
@@ -1256,7 +1265,8 @@ func (m Model) taskView() string {
 				titleStyle = titleStyle.Underline(true)
 			}
 			b.WriteString(style.Render(cursor))
-			b.WriteString(titleStyle.Render(fmt.Sprintf("%-46s", task.Title)))
+			title := ansi.Truncate(task.Title, titleWidth, "...")
+			b.WriteString(titleStyle.Width(titleWidth).Render(title))
 			b.WriteString(style.Render(fmt.Sprintf("  %-10s  ", myn.DateLabel(task.StartDate))))
 			b.WriteString(dueDateStyle(task.DueDate, style).Render(fmt.Sprintf("%-10s", myn.DateLabel(task.DueDate))))
 			b.WriteString(style.Render(fmt.Sprintf("  %-18s", myn.RepeatLabel(task.Repeat))))
@@ -1337,15 +1347,24 @@ func (m Model) priorityHeaderView(priority int, base []toodledo.Task, selected b
 	}
 
 	headerWidth := lipgloss.Width(header) + lipgloss.Width(warningText) + lipgloss.Width(collapsedText)
+	firstColumnWidth := m.taskTitleWidth() + taskCursorWidth
 	padding := ""
-	if headerWidth < 48 {
-		padding = strings.Repeat(" ", 48-headerWidth)
+	if headerWidth < firstColumnWidth {
+		padding = strings.Repeat(" ", firstColumnWidth-headerWidth)
 	}
 
 	return priorityHeaderStyle.Render(header) +
 		errorStyle.Render(warningText) +
 		priorityHeaderStyle.Render(collapsedText+padding) +
 		priorityHeaderStyle.Render(fmt.Sprintf("  %-10s  %-10s  %-18s", "Start", "Due", "Repeat"))
+}
+
+func (m Model) taskTitleWidth() int {
+	width := m.width
+	if width <= 0 {
+		width = defaultTaskListWidth
+	}
+	return max(1, min(width, maxTaskListWidth)-taskListFixedWidth)
 }
 
 func (m Model) createView() string {
