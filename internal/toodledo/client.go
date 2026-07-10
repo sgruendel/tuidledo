@@ -225,6 +225,7 @@ func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
 	return nil
 }
 
+// token requests a new OAuth token from Toodledo.
 func (c *Client) token(ctx context.Context, params url.Values) (Token, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+"/account/token.php", strings.NewReader(params.Encode()))
 	if err != nil {
@@ -248,6 +249,7 @@ func (c *Client) token(ctx context.Context, params url.Values) (Token, error) {
 	return token, nil
 }
 
+// get sends a GET request to the Toodledo API.
 func (c *Client) get(ctx context.Context, path string, params url.Values, dest any) error {
 	if params == nil {
 		params = url.Values{}
@@ -266,6 +268,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, dest a
 	return json.Unmarshal(body, dest)
 }
 
+// post sends a POST request to the Toodledo API.
 func (c *Client) post(ctx context.Context, path string, params url.Values, dest any) error {
 	params.Set("access_token", c.AccessToken)
 	params.Set("f", "json")
@@ -281,6 +284,7 @@ func (c *Client) post(ctx context.Context, path string, params url.Values, dest 
 	return json.Unmarshal(body, dest)
 }
 
+// do sends an HTTP request and returns the response body or an error.
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	hc := c.HTTPClient
 	if hc == nil {

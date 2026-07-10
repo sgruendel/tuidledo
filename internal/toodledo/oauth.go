@@ -86,6 +86,7 @@ func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 	}
 }
 
+// authorizeURL constructs the Toodledo OAuth authorization URL.
 func authorizeURL(clientID, state string) string {
 	values := url.Values{}
 	values.Set("response_type", "code")
@@ -100,6 +101,7 @@ func AuthURL(clientID, state string) string {
 	return authorizeURL(clientID, state)
 }
 
+// randomState generates a random state string for OAuth.
 func randomState() (string, error) {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err != nil {
