@@ -337,7 +337,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if m.editField == editFieldNote {
 				return m.updateFocusedCreateInput(msg)
 			}
-			if m.editField == editFieldStart {
+			if m.editField == editFieldStart || m.editField == editFieldDue {
 				m.selectFocusedDate()
 				return m, nil
 			}
@@ -357,7 +357,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.message = "Creating task..."
 			return m, m.createCmd(title, note)
 		case "h", "left", "l", "right", "j", "down", "k", "up", "H", "L", "x":
-			if m.editField == editFieldStart {
+			if m.editField == editFieldStart || m.editField == editFieldDue {
 				m.updateFocusedDatePicker(key)
 				return m, nil
 			}
@@ -615,6 +615,7 @@ func (m Model) createCmd(title, note string) tea.Cmd {
 		defer cancel()
 		task := m.newTask(title, note, time.Now())
 		task.StartDate = datePickerUnix(m.startPicker)
+		task.DueDate = datePickerUnix(m.duePicker)
 		var created toodledo.Task
 		st, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
 			var err error
@@ -847,6 +848,7 @@ func (m *Model) startCreateForm() {
 	m.titleInput = newTitleInput("", m.width)
 	m.noteInput = newNoteInput("", m.width)
 	m.startPicker = newDatePicker(toodledo.NoonUnix(time.Now()))
+	m.duePicker = newDatePicker(0)
 	m.state = stateCreate
 	m.focusCreateField(editFieldTitle)
 }
@@ -856,6 +858,7 @@ func (m *Model) clearCreateForm() {
 	m.titleInput = textinput.Model{}
 	m.noteInput = textarea.Model{}
 	m.startPicker = datepicker.Model{}
+	m.duePicker = datepicker.Model{}
 }
 
 func (m *Model) clearEditForm() {
@@ -892,18 +895,21 @@ func (m *Model) focusCreateField(field editField) {
 	m.titleInput.Blur()
 	m.noteInput.Blur()
 	m.startPicker.Blur()
+	m.duePicker.Blur()
 	switch field {
 	case editFieldNote:
 		m.noteInput.Focus()
 	case editFieldStart:
 		m.startPicker.SetFocus(datepicker.FocusCalendar)
+	case editFieldDue:
+		m.duePicker.SetFocus(datepicker.FocusCalendar)
 	default:
 		m.titleInput.Focus()
 	}
 }
 
 func (m Model) nextCreateField(direction int) editField {
-	fields := []editField{editFieldTitle, editFieldNote, editFieldStart}
+	fields := []editField{editFieldTitle, editFieldNote, editFieldStart, editFieldDue}
 	for i, field := range fields {
 		if m.editField == field {
 			return fields[(i+direction+len(fields))%len(fields)]
@@ -1398,13 +1404,14 @@ func (m Model) createView() string {
 	if m.message != "" {
 		message = subtleStyle.Render(m.message) + "\n\n"
 	}
-	return fmt.Sprintf("%s\n\nContext: %s\nUrgency: %s\n\nTitle\n%s\n\nNote\n%s\n\nStart\n%s\n\n%s%s\n",
+	return fmt.Sprintf("%s\n\nContext: %s\nUrgency: %s\n\nTitle\n%s\n\nNote\n%s\n\nStart\n%s\n\nDue\n%s\n\n%s%s\n",
 		titleStyle.Render("New Task"),
 		m.contextName(),
 		m.priorityLabel(m.createPriority()),
 		m.titleInput.View(),
 		m.noteInput.View(),
 		m.dateFieldView(editFieldStart, m.startPicker),
+		m.dateFieldView(editFieldDue, m.duePicker),
 		message,
 		helpStyle.Render("tab next field | shift+tab previous | arrows/hjkl change date | ctrl+s create | esc cancel"))
 }

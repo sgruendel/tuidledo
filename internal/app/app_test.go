@@ -350,11 +350,18 @@ func TestCreateFormDefaultsStartDateToToday(t *testing.T) {
 	if got, want := datePickerUnix(m.startPicker), toodledo.NoonUnix(time.Now()); got != want {
 		t.Fatalf("start date = %d, want today %d", got, want)
 	}
+	if m.duePicker.Selected {
+		t.Fatal("duePicker.Selected = true, want false")
+	}
+	if got := datePickerUnix(m.duePicker); got != 0 {
+		t.Fatalf("due date = %d, want none", got)
+	}
 }
 
 func TestCreateFormAllowsChangingStartDate(t *testing.T) {
 	m := testModel()
 	m.startCreateForm()
+	m = updateKey(t, m, "shift+tab")
 	m = updateKey(t, m, "shift+tab")
 	if m.editField != editFieldStart {
 		t.Fatalf("editField = %v, want start", m.editField)
@@ -364,6 +371,23 @@ func TestCreateFormAllowsChangingStartDate(t *testing.T) {
 	m = updateKey(t, m, "l")
 	if got := datePickerUnix(m.startPicker); got <= before {
 		t.Fatalf("start date after right = %d, want after %d", got, before)
+	}
+}
+
+func TestCreateFormAllowsSelectingDueDate(t *testing.T) {
+	m := testModel()
+	m.startCreateForm()
+	m = updateKey(t, m, "shift+tab")
+	if m.editField != editFieldDue {
+		t.Fatalf("editField = %v, want due", m.editField)
+	}
+
+	m = updateKey(t, m, "enter")
+	if !m.duePicker.Selected {
+		t.Fatal("duePicker.Selected = false, want true")
+	}
+	if got := datePickerUnix(m.duePicker); got == 0 {
+		t.Fatal("due date = 0, want selected date")
 	}
 }
 
