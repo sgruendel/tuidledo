@@ -340,6 +340,33 @@ func TestCreatedTaskValuesIncludeNote(t *testing.T) {
 	}
 }
 
+func TestCreateFormDefaultsStartDateToToday(t *testing.T) {
+	m := testModel()
+	m.startCreateForm()
+
+	if !m.startPicker.Selected {
+		t.Fatal("startPicker.Selected = false, want true")
+	}
+	if got, want := datePickerUnix(m.startPicker), toodledo.NoonUnix(time.Now()); got != want {
+		t.Fatalf("start date = %d, want today %d", got, want)
+	}
+}
+
+func TestCreateFormAllowsChangingStartDate(t *testing.T) {
+	m := testModel()
+	m.startCreateForm()
+	m = updateKey(t, m, "shift+tab")
+	if m.editField != editFieldStart {
+		t.Fatalf("editField = %v, want start", m.editField)
+	}
+
+	before := datePickerUnix(m.startPicker)
+	m = updateKey(t, m, "l")
+	if got := datePickerUnix(m.startPicker); got <= before {
+		t.Fatalf("start date after right = %d, want after %d", got, before)
+	}
+}
+
 func TestCreateMsgSelectsCreatedTaskRow(t *testing.T) {
 	m := testModel()
 

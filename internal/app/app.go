@@ -328,14 +328,18 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, m.quitCmd()
 		case "tab":
-			m.focusCreateField((m.editField + 1) % 2)
+			m.focusCreateField(m.nextCreateField(1))
 			return m, nil
 		case "shift+tab":
-			m.focusCreateField((m.editField + 1) % 2)
+			m.focusCreateField(m.nextCreateField(-1))
 			return m, nil
 		case "enter":
 			if m.editField == editFieldNote {
 				return m.updateFocusedCreateInput(msg)
+			}
+			if m.editField == editFieldStart {
+				m.selectFocusedDate()
+				return m, nil
 			}
 			title, note, err := m.createdTaskValues()
 			if err != nil {
@@ -352,6 +356,11 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 			m.message = "Creating task..."
 			return m, m.createCmd(title, note)
+		case "h", "left", "l", "right", "j", "down", "k", "up", "H", "L", "x":
+			if m.editField == editFieldStart {
+				m.updateFocusedDatePicker(key)
+				return m, nil
+			}
 		}
 		return m.updateFocusedCreateInput(msg)
 	}
@@ -605,6 +614,7 @@ func (m Model) createCmd(title, note string) tea.Cmd {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		task := m.newTask(title, note, time.Now())
+		task.StartDate = datePickerUnix(m.startPicker)
 		var created toodledo.Task
 		st, _, err := m.refreshAndRetry(ctx, func(client *toodledo.Client) error {
 			var err error
@@ -836,6 +846,7 @@ func (m *Model) startCreateForm() {
 	m.message = ""
 	m.titleInput = newTitleInput("", m.width)
 	m.noteInput = newNoteInput("", m.width)
+	m.startPicker = newDatePicker(toodledo.NoonUnix(time.Now()))
 	m.state = stateCreate
 	m.focusCreateField(editFieldTitle)
 }
@@ -844,6 +855,7 @@ func (m *Model) clearCreateForm() {
 	m.editField = editFieldTitle
 	m.titleInput = textinput.Model{}
 	m.noteInput = textarea.Model{}
+	m.startPicker = datepicker.Model{}
 }
 
 func (m *Model) clearEditForm() {
@@ -879,11 +891,25 @@ func (m *Model) focusCreateField(field editField) {
 	m.editField = field
 	m.titleInput.Blur()
 	m.noteInput.Blur()
-	if field == editFieldNote {
+	m.startPicker.Blur()
+	switch field {
+	case editFieldNote:
 		m.noteInput.Focus()
-		return
+	case editFieldStart:
+		m.startPicker.SetFocus(datepicker.FocusCalendar)
+	default:
+		m.titleInput.Focus()
 	}
-	m.titleInput.Focus()
+}
+
+func (m Model) nextCreateField(direction int) editField {
+	fields := []editField{editFieldTitle, editFieldNote, editFieldStart}
+	for i, field := range fields {
+		if m.editField == field {
+			return fields[(i+direction+len(fields))%len(fields)]
+		}
+	}
+	return editFieldTitle
 }
 
 func (m Model) updateFocusedCreateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1372,15 +1398,15 @@ func (m Model) createView() string {
 	if m.message != "" {
 		message = subtleStyle.Render(m.message) + "\n\n"
 	}
-	return fmt.Sprintf("%s\n\nContext: %s\nUrgency: %s\nStart: %s\n\nTitle\n%s\n\nNote\n%s\n\n%s%s\n",
+	return fmt.Sprintf("%s\n\nContext: %s\nUrgency: %s\n\nTitle\n%s\n\nNote\n%s\n\nStart\n%s\n\n%s%s\n",
 		titleStyle.Render("New Task"),
 		m.contextName(),
 		m.priorityLabel(m.createPriority()),
-		myn.DateLabel(toodledo.NoonUnix(time.Now())),
 		m.titleInput.View(),
 		m.noteInput.View(),
+		m.dateFieldView(editFieldStart, m.startPicker),
 		message,
-		helpStyle.Render("tab next field | shift+tab previous | enter create from title | ctrl+s create | esc cancel"))
+		helpStyle.Render("tab next field | shift+tab previous | arrows/hjkl change date | ctrl+s create | esc cancel"))
 }
 
 func (m Model) confirmDeleteView() string {
