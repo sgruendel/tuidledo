@@ -70,7 +70,11 @@ func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 			errCh <- err
 		}
 	}()
-	defer server.Shutdown(context.Background())
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+	}()
 
 	authURL := authorizeURL(clientID, state)
 	fmt.Fprintf(os.Stderr, "\r\nOpen this URL to authorize tuidledo:\r\n\r\n%s\r\n\r\nRedirect URI: %s\r\n\r\nWaiting for browser callback...\r\n", authURL, redirectURI)

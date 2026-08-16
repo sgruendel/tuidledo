@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const baseURL = "https://api.toodledo.com/3"
+const (
+	baseURL            = "https://api.toodledo.com/3"
+	defaultHTTPTimeout = 20 * time.Second
+)
 
 var apiBaseURL = baseURL
 
@@ -39,7 +42,7 @@ func (e UnauthorizedError) Error() string {
 // NewClient returns a Toodledo API client.
 func NewClient(clientID, clientSecret, accessToken string) *Client {
 	return &Client{
-		HTTPClient:   &http.Client{Timeout: 20 * time.Second},
+		HTTPClient:   &http.Client{Timeout: defaultHTTPTimeout},
 		AccessToken:  accessToken,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -56,8 +59,8 @@ func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (Token, 
 	return c.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "f": {"json"}})
 }
 
-// GetContexts returns the user's Toodledo contexts.
-func (c *Client) GetContexts(ctx context.Context) ([]Context, error) {
+// Contexts returns the user's Toodledo contexts.
+func (c *Client) Contexts(ctx context.Context) ([]Context, error) {
 	var raw []json.RawMessage
 	if err := c.get(ctx, "/contexts/get.php", nil, &raw); err != nil {
 		return nil, err
@@ -77,8 +80,8 @@ func (c *Client) GetContexts(ctx context.Context) ([]Context, error) {
 	return contexts, nil
 }
 
-// GetTasks returns incomplete tasks with the fields used by the application.
-func (c *Client) GetTasks(ctx context.Context) ([]Task, error) {
+// Tasks returns incomplete tasks with the fields used by the application.
+func (c *Client) Tasks(ctx context.Context) ([]Task, error) {
 	params := url.Values{}
 	params.Set("comp", "0")
 	params.Set("fields", taskFields)
@@ -288,7 +291,7 @@ func (c *Client) post(ctx context.Context, path string, params url.Values, dest 
 func (c *Client) do(req *http.Request) ([]byte, error) {
 	hc := c.HTTPClient
 	if hc == nil {
-		hc = http.DefaultClient
+		hc = &http.Client{Timeout: defaultHTTPTimeout}
 	}
 	resp, err := hc.Do(req)
 	if err != nil {

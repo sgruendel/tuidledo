@@ -36,7 +36,7 @@ jobs:
         run: go vet ./...
 
       - name: Build
-        run: go build ./cmd/tuidledo
+        run: go build .
 
   release:
     name: Release Binaries
@@ -102,7 +102,7 @@ jobs:
           go build -trimpath \
             -ldflags "-s -w -X main.version=$VERSION -X main.clientID=$TOODLEDO_CLIENT_ID -X main.clientSecret=$TOODLEDO_CLIENT_SECRET" \
             -o "$dist_dir/$BINARY_NAME" \
-            ./cmd/tuidledo
+            .
 
           cp README.md LICENSE "$dist_dir/"
 

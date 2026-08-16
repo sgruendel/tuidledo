@@ -1,4 +1,4 @@
-package app
+package tui
 
 import (
 	"regexp"
@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/sgruendel/tuidledo/internal/config"
-	"github.com/sgruendel/tuidledo/internal/toodledo"
+	"github.com/sgruendel/tuidledo/config"
+	"github.com/sgruendel/tuidledo/toodledo"
 )
 
 func TestNavigationMovesCursor(t *testing.T) {

@@ -57,7 +57,7 @@ Existing environment variables still take precedence.
 Run the TUI:
 
 ```sh
-go run ./cmd/tuidledo
+go run .
 ```
 
 If you are running an official release binary, you do not need to set
@@ -73,13 +73,13 @@ tuidledo --version
 Release builds can stamp the version with:
 
 ```sh
-go build -ldflags "-X main.version=0.1.0" ./cmd/tuidledo
+go build -ldflags "-X main.version=0.1.0" .
 ```
 
 To build a distributable binary with embedded Toodledo credentials yourself:
 
 ```sh
-go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X main.clientSecret=$TOODLEDO_CLIENT_SECRET" ./cmd/tuidledo
+go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X main.clientSecret=$TOODLEDO_CLIENT_SECRET" .
 ```
 
 ## Releases

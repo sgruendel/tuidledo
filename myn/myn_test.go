@@ -1,11 +1,11 @@
 package myn
 
 import (
-	"reflect"
+	"slices"
 	"testing"
 	"time"
 
-	"github.com/sgruendel/tuidledo/internal/toodledo"
+	"github.com/sgruendel/tuidledo/toodledo"
 )
 
 func TestVisibleTasksFiltersMYNTasks(t *testing.T) {
@@ -19,7 +19,7 @@ func TestVisibleTasksFiltersMYNTasks(t *testing.T) {
 
 	got := VisibleTasks(tasks, 0, "", now)
 	wantIDs := []int64{1}
-	if ids := taskIDs(got); !reflect.DeepEqual(ids, wantIDs) {
+	if ids := taskIDs(got); !slices.Equal(ids, wantIDs) {
 		t.Fatalf("VisibleTasks IDs = %v, want %v", ids, wantIDs)
 	}
 }
@@ -34,7 +34,7 @@ func TestVisibleTasksFiltersContextAndQuery(t *testing.T) {
 
 	got := VisibleTasks(tasks, 20, "report", now)
 	wantIDs := []int64{3}
-	if ids := taskIDs(got); !reflect.DeepEqual(ids, wantIDs) {
+	if ids := taskIDs(got); !slices.Equal(ids, wantIDs) {
 		t.Fatalf("VisibleTasks IDs = %v, want %v", ids, wantIDs)
 	}
 }
@@ -50,7 +50,7 @@ func TestVisibleTasksSortsByPriorityThenStartDateDescending(t *testing.T) {
 
 	got := VisibleTasks(tasks, 0, "", now)
 	wantIDs := []int64{3, 1, 4, 2}
-	if ids := taskIDs(got); !reflect.DeepEqual(ids, wantIDs) {
+	if ids := taskIDs(got); !slices.Equal(ids, wantIDs) {
 		t.Fatalf("VisibleTasks IDs = %v, want %v", ids, wantIDs)
 	}
 }

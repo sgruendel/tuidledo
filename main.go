@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/joho/godotenv"
 
-	"github.com/sgruendel/tuidledo/internal/app"
+	"github.com/sgruendel/tuidledo/tui"
 )
 
 var version = "dev"
@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 
-	program := tea.NewProgram(app.New(clientID, clientSecret))
+	program := tea.NewProgram(tui.New(clientID, clientSecret))
 	if _, err := program.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "tuidledo: %v\n", err)
 		os.Exit(1)

@@ -1,7 +1,6 @@
 package toodledo
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -57,7 +56,7 @@ func TestAddTaskIncludesNote(t *testing.T) {
 	apiBaseURL = server.URL
 	defer func() { apiBaseURL = oldBaseURL }()
 
-	_, err := client.AddTask(context.Background(), Task{Title: "new task", Note: "new note"})
+	_, err := client.AddTask(t.Context(), Task{Title: "new task", Note: "new note"})
 	if err != nil {
 		t.Fatal(err)
 	}

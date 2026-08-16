@@ -1,4 +1,4 @@
-package app
+package tui
 
 import (
 	"context"
@@ -17,10 +17,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	datepicker "github.com/ethanefung/bubble-datepicker"
 
-	"github.com/sgruendel/tuidledo/internal/config"
-	"github.com/sgruendel/tuidledo/internal/myn"
-	statepkg "github.com/sgruendel/tuidledo/internal/state"
-	"github.com/sgruendel/tuidledo/internal/toodledo"
+	"github.com/sgruendel/tuidledo/config"
+	"github.com/sgruendel/tuidledo/myn"
+	statepkg "github.com/sgruendel/tuidledo/state"
+	"github.com/sgruendel/tuidledo/toodledo"
 )
 
 type state int
@@ -760,11 +760,11 @@ func (m Model) quitCmd() tea.Cmd {
 }
 
 func fetchAll(ctx context.Context, client *toodledo.Client) ([]toodledo.Context, []toodledo.Task, error) {
-	contexts, err := client.GetContexts(ctx)
+	contexts, err := client.Contexts(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	tasks, err := client.GetTasks(ctx)
+	tasks, err := client.Tasks(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

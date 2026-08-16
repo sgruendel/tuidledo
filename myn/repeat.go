@@ -2,7 +2,6 @@ package myn
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -171,15 +170,4 @@ func ordinal(value string) string {
 		}
 	}
 	return fmt.Sprintf("%d%s", n, suffix)
-}
-
-// KnownRepeatKeys returns the sorted keys present in a repeat rule.
-func KnownRepeatKeys(rule string) []string {
-	parts := parseRepeatRule(rule)
-	keys := make([]string, 0, len(parts))
-	for key := range parts {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
 }

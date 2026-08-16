@@ -1,11 +1,12 @@
 package myn
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/sgruendel/tuidledo/internal/toodledo"
+	"github.com/sgruendel/tuidledo/toodledo"
 )
 
 // VisibleTasks filters and sorts tasks for the MYN task list.
@@ -30,21 +31,20 @@ func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time
 		visible = append(visible, task)
 	}
 
-	sort.SliceStable(visible, func(i, j int) bool {
-		left, right := visible[i], visible[j]
+	slices.SortStableFunc(visible, func(left, right toodledo.Task) int {
 		if left.Priority != right.Priority {
-			return left.Priority > right.Priority
+			return cmp.Compare(right.Priority, left.Priority)
 		}
 		if left.StartDate == 0 && right.StartDate != 0 {
-			return false
+			return 1
 		}
 		if left.StartDate != 0 && right.StartDate == 0 {
-			return true
+			return -1
 		}
 		if left.StartDate != right.StartDate {
-			return left.StartDate > right.StartDate
+			return cmp.Compare(right.StartDate, left.StartDate)
 		}
-		return strings.ToLower(left.Title) < strings.ToLower(right.Title)
+		return cmp.Compare(strings.ToLower(left.Title), strings.ToLower(right.Title))
 	})
 
 	return visible
