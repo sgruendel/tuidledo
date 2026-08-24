@@ -3,7 +3,8 @@ package toodledo
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"net/http"
@@ -61,7 +62,7 @@ func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (Token, 
 
 // Contexts returns the user's Toodledo contexts.
 func (c *Client) Contexts(ctx context.Context) ([]Context, error) {
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.get(ctx, "/contexts/get.php", nil, &raw); err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (c *Client) Tasks(ctx context.Context) ([]Task, error) {
 	params.Set("comp", "0")
 	params.Set("fields", taskFields)
 
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.get(ctx, "/tasks/get.php", params, &raw); err != nil {
 		return nil, err
 	}
@@ -128,7 +129,7 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	params.Set("tasks", string(payload))
 	params.Set("fields", taskFields)
 
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.post(ctx, "/tasks/add.php", params, &raw); err != nil {
 		return Task{}, err
 	}
@@ -164,7 +165,7 @@ func (c *Client) EditTask(ctx context.Context, task Task) (Task, error) {
 	params.Set("tasks", string(payload))
 	params.Set("fields", taskFields)
 
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.post(ctx, "/tasks/edit.php", params, &raw); err != nil {
 		return Task{}, err
 	}
@@ -193,7 +194,7 @@ func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt tim
 	params.Set("reschedule", "1")
 	params.Set("fields", taskFields)
 
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.post(ctx, "/tasks/edit.php", params, &raw); err != nil {
 		return err
 	}
@@ -215,7 +216,7 @@ func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
 	params := url.Values{}
 	params.Set("tasks", string(payload))
 
-	var raw []json.RawMessage
+	var raw []jsontext.Value
 	if err := c.post(ctx, "/tasks/delete.php", params, &raw); err != nil {
 		return err
 	}

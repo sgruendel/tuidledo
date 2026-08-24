@@ -1,7 +1,7 @@
 package toodledo
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"io"
 	"net/http"
@@ -10,27 +10,27 @@ import (
 )
 
 func TestDoReturnsUnauthorizedError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"errorCode":2,"errorDesc":"Unauthorized"}`))
 	}))
-	defer server.Close()
+
+	client := NewClient("", "", "")
+	client.HTTPClient = server.Client()
 
 	req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client := NewClient("", "", "")
 	_, err = client.do(req)
-	var unauthorized UnauthorizedError
-	if !errors.As(err, &unauthorized) {
+	if _, ok := errors.AsType[UnauthorizedError](err); !ok {
 		t.Fatalf("error = %T %v, want UnauthorizedError", err, err)
 	}
 }
 
 func TestAddTaskIncludesNote(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,6 @@ func TestAddTaskIncludesNote(t *testing.T) {
 		}
 		_, _ = io.WriteString(w, `[{"id":1,"title":"new task","note":"new note","priority":1,"startdate":0,"context":0}]`)
 	}))
-	defer server.Close()
 
 	client := NewClient("", "", "token")
 	client.HTTPClient = server.Client()

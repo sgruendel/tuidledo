@@ -706,7 +706,7 @@ func stripANSI(value string) string {
 
 func taskLineContaining(t *testing.T, view, value string) string {
 	t.Helper()
-	for _, line := range strings.Split(view, "\n") {
+	for line := range strings.SplitSeq(view, "\n") {
 		if strings.Contains(line, value) {
 			return line
 		}

@@ -1,7 +1,8 @@
 package toodledo
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"time"
 )
 
@@ -40,7 +41,7 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 	type taskAlias Task
 	var raw struct {
 		*taskAlias
-		Attachment json.RawMessage `json:"attachment"`
+		Attachment jsontext.Value `json:"attachment"`
 	}
 	raw.taskAlias = (*taskAlias)(t)
 	if err := json.Unmarshal(data, &raw); err != nil {

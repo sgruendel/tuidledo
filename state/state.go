@@ -1,7 +1,8 @@
 package state
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -100,7 +101,7 @@ func saveToPath(path string, st State) error {
 		return err
 	}
 
-	data, err := json.MarshalIndent(st, "", "  ")
+	data, err := json.Marshal(st, jsontext.WithIndent("  "))
 	if err != nil {
 		return err
 	}
