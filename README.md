@@ -1,6 +1,7 @@
 # tuidledo
 
 [![build](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml/badge.svg)](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml)
+[![Coverage](https://img.shields.io/badge/Coverage-51.7%25-yellow)](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml)
 
 Go TUI client for [Toodledo](https://www.toodledo.com/), focused on a
 [Master Your Now](https://www.michaellinenberger.com/AboutMYN.html) style task list.
@@ -84,12 +85,18 @@ go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X
 
 ## Releases
 
-The GitHub Actions workflow does three things:
+The GitHub Actions workflow:
 
-- runs formatting, tests, and a normal build on pushes and pull requests
+- checks formatting, runs race-enabled tests and `go vet`, and builds on pushes
+  and pull requests
+- uploads a coverage profile and function summary after successful test jobs
+- updates the README coverage badge after successful pushes and manual runs on
+  `main`, skipping results if `main` has advanced since testing
 - builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64,
   and macOS arm64 on tags like `v0.1.0`
 - publishes a matching `.sha256` checksum file for each release archive
+
+The badge job needs permission to push to `main`, including any branch rules.
 
 To enable release builds, add these repository secrets:
 
