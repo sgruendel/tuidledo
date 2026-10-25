@@ -113,12 +113,21 @@ git push origin v0.1.0
 That tag run uploads workflow artifacts and publishes the packaged binaries plus
 their checksum files as GitHub release assets.
 
-On first launch, open the printed authorization URL and approve access. Tokens
+On first launch, open the authorization URL shown in the TUI and approve access. Tokens
 and the last selected context are stored in:
 
 - Linux: `$XDG_STATE_HOME/tuidledo/state.json`, or `~/.local/state/tuidledo/state.json`
 - macOS: `~/Library/Application Support/tuidledo/state.json`
 - Windows: `%LOCALAPPDATA%\tuidledo\state.json`
+
+If your session expires or Toodledo rejects the refresh token, press `r` on the
+error screen to sign in again. Open the displayed URL and approve access; tuidledo
+saves the new tokens and refreshes your task list. Your last selected context is
+preserved. You can also press `a` on any error screen to sign in again manually.
+For other errors, `r` retries the connection.
+On the error screen, `esc` returns to the form or task view without resyncing,
+and `?` opens help. Failed sign-in attempts show their cause, with setup guidance
+for unavailable callback ports or rejected app credentials.
 
 ## MYN Filtering
 

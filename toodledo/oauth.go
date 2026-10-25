@@ -9,7 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
+	"sync"
 	"time"
 )
 
@@ -23,16 +23,32 @@ type AuthResult struct {
 	RedirectURI string
 }
 
-// WaitForAuthCode starts a local callback server and waits for an OAuth code.
-func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
+// AuthSession owns a local OAuth callback server until Wait or Close is called.
+type AuthSession struct {
+	AuthURL     string
+	RedirectURI string
+	server      *http.Server
+	listener    net.Listener
+	resultCh    chan AuthResult
+	errCh       chan error
+	done        chan struct{}
+	closeOnce   sync.Once
+}
+
+// StartAuthCode starts the callback server and returns the URL to show the user.
+func StartAuthCode(clientID string) (*AuthSession, error) {
+	return startAuthCode(clientID, "127.0.0.1:8765")
+}
+
+func startAuthCode(clientID, address string) (*AuthSession, error) {
 	state, err := randomState()
 	if err != nil {
-		return AuthResult{}, err
+		return nil, err
 	}
 
-	listener, err := net.Listen("tcp", "127.0.0.1:8765")
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return AuthResult{}, err
+		return nil, fmt.Errorf("cannot listen for the OAuth callback on %s; make sure this address is available: %w", address, err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	redirectURI := fmt.Sprintf("http://127.0.0.1:%d%s", port, callbackPath)
@@ -40,6 +56,16 @@ func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 	resultCh := make(chan AuthResult, 1)
 	errCh := make(chan error, 1)
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
+	session := &AuthSession{
+		AuthURL: authorizeURL(clientID, state), RedirectURI: redirectURI,
+		server: server, listener: listener, resultCh: resultCh, errCh: errCh, done: make(chan struct{}),
+	}
+	reportError := func(err error) {
+		select {
+		case errCh <- err:
+		default:
+		}
+	}
 	server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != callbackPath {
 			http.NotFound(w, r)
@@ -47,46 +73,62 @@ func WaitForAuthCode(ctx context.Context, clientID string) (AuthResult, error) {
 		}
 		if got := r.URL.Query().Get("state"); got != state {
 			http.Error(w, "invalid oauth state", http.StatusBadRequest)
-			errCh <- errors.New("invalid oauth state")
+			reportError(errors.New("invalid oauth state"))
 			return
 		}
 		if errText := r.URL.Query().Get("error"); errText != "" {
 			http.Error(w, errText, http.StatusBadRequest)
-			errCh <- errors.New(errText)
+			reportError(errors.New(errText))
 			return
 		}
 		code := r.URL.Query().Get("code")
 		if code == "" {
 			http.Error(w, "missing oauth code", http.StatusBadRequest)
-			errCh <- errors.New("missing oauth code")
+			reportError(errors.New("missing oauth code"))
 			return
 		}
 		_, _ = w.Write([]byte("Authorization received. You can return to tuidledo."))
-		resultCh <- AuthResult{Code: code, State: state, RedirectURI: redirectURI, AuthURL: authorizeURL(clientID, state)}
+		select {
+		case resultCh <- AuthResult{Code: code, State: state, RedirectURI: redirectURI, AuthURL: session.AuthURL}:
+		default:
+		}
 	})
 
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errCh <- err
+			reportError(err)
 		}
 	}()
+	return session, nil
+}
+
+// Close releases the local callback listener, including when sign-in is canceled.
+func (s *AuthSession) Close() {
+	s.closeOnce.Do(func() {
+		_ = s.server.Close()
+		_ = s.listener.Close()
+		close(s.done)
+	})
+}
+
+// Wait waits for the callback and releases the callback server before returning.
+func (s *AuthSession) Wait(ctx context.Context) (AuthResult, error) {
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = server.Shutdown(shutdownCtx)
+		_ = s.server.Shutdown(shutdownCtx)
+		s.Close()
 	}()
 
-	authURL := authorizeURL(clientID, state)
-	fmt.Fprintf(os.Stderr, "\r\nOpen this URL to authorize tuidledo:\r\n\r\n%s\r\n\r\nRedirect URI: %s\r\n\r\nWaiting for browser callback...\r\n", authURL, redirectURI)
 	select {
-	case result := <-resultCh:
-		result.AuthURL = authURL
-		result.RedirectURI = redirectURI
+	case result := <-s.resultCh:
 		return result, nil
-	case err := <-errCh:
+	case err := <-s.errCh:
 		return AuthResult{}, err
 	case <-ctx.Done():
 		return AuthResult{}, ctx.Err()
+	case <-s.done:
+		return AuthResult{}, context.Canceled
 	}
 }
 

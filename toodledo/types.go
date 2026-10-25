@@ -3,6 +3,7 @@ package toodledo
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"fmt"
 	"time"
 )
 
@@ -66,6 +67,11 @@ type APIError struct {
 	ErrorCode int    `json:"errorCode"`
 	ErrorDesc string `json:"errorDesc"`
 	Ref       string `json:"ref"`
+}
+
+// Error returns the error reported by Toodledo.
+func (e APIError) Error() string {
+	return fmt.Sprintf("toodledo API %d: %s", e.ErrorCode, e.ErrorDesc)
 }
 
 // NoonUnix returns the Unix timestamp for noon UTC on t's date.

@@ -27,6 +27,7 @@ type state int
 
 const (
 	stateLoading state = iota
+	stateAuthorizing
 	stateTasks
 	stateDetails
 	stateSearch
@@ -36,6 +37,26 @@ const (
 	stateHelp
 	stateError
 )
+
+// signInError keeps a failed sign-in attempt distinct from an expired session.
+type signInError struct{ err error }
+
+func (e signInError) Error() string { return "Sign-in failed: " + e.err.Error() }
+func (e signInError) Unwrap() error { return e.err }
+
+type authStartedMsg struct {
+	session *toodledo.AuthSession
+	err     error
+}
+
+type authMsg struct {
+	st  statepkg.State
+	err error
+}
+
+type authCodeWaiter interface {
+	Wait(context.Context) (toodledo.AuthResult, error)
+}
 
 type syncMsg struct {
 	contexts []toodledo.Context
@@ -101,8 +122,11 @@ type Model struct {
 	client              *toodledo.Client
 	state               state
 	previous            state
+	errorReturn         state
 	message             string
 	err                 error
+	authSession         *toodledo.AuthSession
+	authCancel          context.CancelFunc
 	contexts            []toodledo.Context
 	contextIndex        int
 	tasks               []toodledo.Task
@@ -140,7 +164,7 @@ func New(clientID, clientSecret string) Model {
 	if clientSecret == "" {
 		clientSecret = os.Getenv("TOODLEDO_CLIENT_SECRET")
 	}
-	m := Model{config: appConfig, st: st, state: stateLoading, message: "Starting tuidledo...\n\nIf authorization is needed, open the URL printed below and return here after approving access."}
+	m := Model{config: appConfig, st: st, state: stateLoading, message: "Starting tuidledo..."}
 	if configErr != nil {
 		m.state = stateError
 		m.err = configErr
@@ -169,52 +193,70 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-	case syncMsg:
+	case authStartedMsg:
 		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+			m.showError(signInError{msg.err}, stateTasks)
+			return m, nil
+		}
+		m.authSession = msg.session
+		m.state = stateAuthorizing
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		m.authCancel = cancel
+		return m, m.authorizeCmd(ctx, msg.session)
+	case authMsg:
+		if m.authCancel != nil {
+			m.authCancel()
+		}
+		m.authCancel = nil
+		m.authSession = nil
+		if msg.err != nil {
+			m.showError(signInError{msg.err}, stateTasks)
+			return m, nil
+		}
+		m.applyState(msg.st)
+		m.err = nil
+		m.state = stateLoading
+		m.message = "Signed in. Refreshing tasks..."
+		return m, m.syncCmd()
+	case syncMsg:
+		m.applyState(msg.st)
+		if msg.err != nil {
+			m.showError(msg.err, stateTasks)
 			return m, nil
 		}
 		m.contexts = msg.contexts
 		m.tasks = msg.tasks
-		if msg.st.AccessToken != "" {
-			m.st = msg.st
-			m.client = toodledo.NewClient(m.clientID, m.clientSecret, m.st.AccessToken)
-		}
 		m.restoreContext()
 		m.state = stateTasks
 		m.message = fmt.Sprintf("Synced %d tasks", len(msg.tasks))
 		m.refreshVisible()
 		return m, nil
 	case completeMsg:
+		m.applyState(msg.st)
 		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+			m.showError(msg.err, m.taskErrorReturn())
 			return m, nil
 		}
-		m.applyState(msg.st)
 		m.removeTask(msg.taskID)
 		m.message = "Completed task"
 		m.refreshVisible()
 		return m, nil
 	case deleteMsg:
+		m.applyState(msg.st)
 		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+			m.showError(msg.err, m.taskErrorReturn())
 			return m, nil
 		}
-		m.applyState(msg.st)
 		m.removeTask(msg.taskID)
 		m.message = "Deleted task"
 		m.refreshVisible()
 		return m, nil
 	case createMsg:
+		m.applyState(msg.st)
 		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+			m.showError(msg.err, stateCreate)
 			return m, nil
 		}
-		m.applyState(msg.st)
 		m.tasks = append(m.tasks, msg.task)
 		m.clearCreateForm()
 		m.state = stateTasks
@@ -223,12 +265,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectTaskByID(msg.task.ID)
 		return m, nil
 	case editMsg:
+		m.applyState(msg.st)
 		if msg.err != nil {
-			m.state = stateError
-			m.err = msg.err
+			m.showError(msg.err, stateEditTask)
 			return m, nil
 		}
-		m.applyState(msg.st)
 		m.updateTask(msg.task)
 		m.state = stateDetails
 		m.message = "Updated task"
@@ -250,11 +291,21 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) viewString() string {
+	if m.state == stateAuthorizing {
+		return titleStyle.Render("tuidledo") + "\n\nOpen this URL in your browser and approve access:\n\n" +
+			m.authSession.AuthURL + "\n\nWaiting for browser callback...\n\nq quit\n"
+	}
 	if m.state == stateLoading {
 		return titleStyle.Render("tuidledo") + "\n\n" + m.message + "\n"
 	}
 	if m.state == stateError {
-		return titleStyle.Render("tuidledo") + "\n\n" + errorStyle.Render(m.err.Error()) + "\n\nq quit | r retry\n"
+		message := m.err.Error()
+		help := "q quit | r retry | a sign in again"
+		if requiresSignIn(m.err) {
+			message = "Your Toodledo session needs authorization. Sign in again to continue.\n\n" + message
+			help = "q quit | r sign in again"
+		}
+		return titleStyle.Render("tuidledo") + "\n\n" + errorStyle.Render(message) + "\n\n" + help + " | esc back | ? help\n"
 	}
 	if m.state == stateHelp {
 		return m.helpView()
@@ -291,6 +342,51 @@ func (m Model) handlePaste(msg tea.PasteMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	if m.state == stateLoading || m.state == stateAuthorizing {
+		if key == "q" || key == "ctrl+c" {
+			return m, m.quitCmd()
+		}
+		return m, nil
+	}
+	if m.state == stateError {
+		switch key {
+		case "q", "ctrl+c":
+			return m, m.quitCmd()
+		case "esc":
+			switch m.errorReturn {
+			case stateCreate, stateEditTask, stateDetails:
+				m.state = m.errorReturn
+			default:
+				m.state = stateTasks
+			}
+			m.err = nil
+			m.message = ""
+			return m, nil
+		case "?":
+			m.previous = stateError
+			m.state = stateHelp
+			return m, nil
+		case "a", "r":
+			m.state = stateLoading
+			var signInFailure signInError
+			if key == "a" || requiresSignIn(m.err) || errors.As(m.err, &signInFailure) {
+				m.message = "Starting sign-in..."
+				return m, m.startAuthCmd()
+			}
+			m.message = "Retrying..."
+			return m, m.startupCmd()
+		}
+		return m, nil
+	}
+	if m.state == stateHelp {
+		switch key {
+		case "esc", "q", "?":
+			m.state = m.previous
+		case "ctrl+c":
+			return m, m.quitCmd()
+		}
+		return m, nil
+	}
 	if m.state == stateSearch {
 		switch key {
 		case "esc":
@@ -540,35 +636,66 @@ func (m Model) startupCmd() tea.Cmd {
 		if m.clientID == "" || m.clientSecret == "" {
 			return syncMsg{err: fmt.Errorf("set TOODLEDO_CLIENT_ID and TOODLEDO_CLIENT_SECRET, then register redirect URI http://127.0.0.1:8765/callback")}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
+		if m.st.AccessToken == "" && m.st.RefreshToken == "" {
+			return m.startAuthCmd()()
+		}
+		return m.syncCmd()()
+	}
+}
 
-		client := toodledo.NewClient(m.clientID, m.clientSecret, m.st.AccessToken)
-		st := m.st
-		st, client, err := refreshTokenIfNeeded(ctx, st, client)
+func requiresSignIn(err error) bool {
+	var signInFailure signInError
+	if errors.As(err, &signInFailure) {
+		return false
+	}
+	var unauthorized toodledo.UnauthorizedError
+	return errors.Is(err, toodledo.ErrInvalidRefreshToken) || errors.As(err, &unauthorized)
+}
+
+func (m *Model) showError(err error, returnTo state) {
+	m.err = err
+	m.errorReturn = returnTo
+	m.state = stateError
+}
+
+func (m Model) taskErrorReturn() state {
+	if m.state == stateDetails {
+		return stateDetails
+	}
+	return stateTasks
+}
+
+func (m Model) startAuthCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.clientID == "" || m.clientSecret == "" {
+			return authStartedMsg{err: errors.New("set TOODLEDO_CLIENT_ID and TOODLEDO_CLIENT_SECRET, then restart tuidledo before signing in")}
+		}
+		session, err := toodledo.StartAuthCode(m.clientID)
+		return authStartedMsg{session: session, err: err}
+	}
+}
+
+func (m Model) authorizeCmd(ctx context.Context, session authCodeWaiter) tea.Cmd {
+	return func() tea.Msg {
+		result, err := session.Wait(ctx)
 		if err != nil {
-			return syncMsg{err: err}
+			return authMsg{err: fmt.Errorf("waiting for browser authorization: %w", err)}
 		}
-		if st.AccessToken == "" || time.Now().After(st.TokenExpiry) {
-			result, err := toodledo.WaitForAuthCode(ctx, m.clientID)
-			if err != nil {
-				return syncMsg{err: err}
+		client := toodledo.NewClient(m.clientID, m.clientSecret, "")
+		token, err := client.ExchangeCode(ctx, result.Code)
+		if err != nil {
+			var apiErr toodledo.APIError
+			var unauthorized toodledo.UnauthorizedError
+			if errors.As(err, &unauthorized) || (errors.As(err, &apiErr) && apiErr.ErrorCode == 102) {
+				return authMsg{err: fmt.Errorf("authorization code exchange rejected; check TOODLEDO_CLIENT_ID, TOODLEDO_CLIENT_SECRET and the registered redirect URI, then restart tuidledo: %w", err)}
 			}
-			token, err := client.ExchangeCode(ctx, result.Code)
-			if err != nil {
-				return syncMsg{err: err}
-			}
-			st.AccessToken = token.AccessToken
-			st.RefreshToken = token.RefreshToken
-			st.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-			if err := statepkg.Save(st); err != nil {
-				return syncMsg{err: err}
-			}
-			client.AccessToken = st.AccessToken
+			return authMsg{err: fmt.Errorf("exchange authorization code: %w", err)}
 		}
-
-		contexts, tasks, err := fetchAll(ctx, client)
-		return syncMsg{contexts: contexts, tasks: tasks, st: st, err: err}
+		st, err := saveToken(m.st, token)
+		if err != nil {
+			return authMsg{err: fmt.Errorf("save sign-in credentials: %w", err)}
+		}
+		return authMsg{st: st}
 	}
 }
 
@@ -711,11 +838,9 @@ func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Cli
 		if refreshErr != nil {
 			return st, client, refreshErr
 		}
-		st.AccessToken = token.AccessToken
-		st.RefreshToken = token.RefreshToken
-		st.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-		if saveErr := statepkg.Save(st); saveErr != nil {
-			return st, client, saveErr
+		st, err = saveToken(st, token)
+		if err != nil {
+			return st, client, err
 		}
 		client.AccessToken = st.AccessToken
 		if retryErr := operation(client); retryErr != nil {
@@ -726,21 +851,28 @@ func (m Model) refreshAndRetry(ctx context.Context, operation func(*toodledo.Cli
 }
 
 func refreshTokenIfNeeded(ctx context.Context, st statepkg.State, client *toodledo.Client) (statepkg.State, *toodledo.Client, error) {
-	if st.RefreshToken == "" || time.Now().Before(st.TokenExpiry.Add(-5*time.Minute)) {
+	if st.RefreshToken == "" || (st.AccessToken != "" && time.Now().Before(st.TokenExpiry.Add(-5*time.Minute))) {
 		return st, client, nil
 	}
 	token, err := client.RefreshToken(ctx, st.RefreshToken)
 	if err != nil {
 		return st, client, err
 	}
-	st.AccessToken = token.AccessToken
-	st.RefreshToken = token.RefreshToken
-	st.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
-	if err := statepkg.Save(st); err != nil {
+	st, err = saveToken(st, token)
+	if err != nil {
 		return st, client, err
 	}
 	client.AccessToken = st.AccessToken
 	return st, client, nil
+}
+
+// saveToken returns the updated state even if persistence fails, since refresh
+// tokens can only be used once and callers must retain the replacement.
+func saveToken(st statepkg.State, token toodledo.Token) (statepkg.State, error) {
+	st.AccessToken = token.AccessToken
+	st.RefreshToken = token.RefreshToken
+	st.TokenExpiry = time.Now().Add(time.Duration(token.ExpiresIn) * time.Second)
+	return st, statepkg.Save(st)
 }
 
 func (m *Model) applyState(st statepkg.State) {
@@ -752,11 +884,19 @@ func (m *Model) applyState(st statepkg.State) {
 }
 
 func (m Model) quitCmd() tea.Cmd {
-	m.st.LastContextID = m.currentContextID()
-	return tea.Sequence(func() tea.Msg {
+	if m.authCancel != nil {
+		m.authCancel()
+	}
+	if m.authSession != nil {
+		m.authSession.Close()
+	}
+	if len(m.contexts) > 0 {
+		m.st.LastContextID = m.currentContextID()
+	}
+	return func() tea.Msg {
 		_ = statepkg.Save(m.st)
-		return nil
-	}, tea.Quit)
+		return tea.Quit()
+	}
 }
 
 func fetchAll(ctx context.Context, client *toodledo.Client) ([]toodledo.Context, []toodledo.Task, error) {

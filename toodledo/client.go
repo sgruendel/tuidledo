@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,9 @@ const (
 )
 
 var apiBaseURL = baseURL
+
+// ErrInvalidRefreshToken indicates that the user must authorize the app again.
+var ErrInvalidRefreshToken = errors.New("invalid Toodledo refresh token")
 
 const taskFields = "priority,startdate,duedate,repeat,context,note,attachment"
 
@@ -57,7 +61,12 @@ func (c *Client) ExchangeCode(ctx context.Context, code string) (Token, error) {
 
 // RefreshToken exchanges a refresh token for a new access token.
 func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (Token, error) {
-	return c.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "f": {"json"}})
+	token, err := c.token(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}, "f": {"json"}})
+	var apiErr APIError
+	if errors.As(err, &apiErr) && apiErr.ErrorCode == 102 && strings.Contains(strings.ToLower(apiErr.ErrorDesc), "refresh token") {
+		return Token{}, fmt.Errorf("%w: %w", ErrInvalidRefreshToken, err)
+	}
+	return token, err
 }
 
 // Contexts returns the user's Toodledo contexts.
@@ -70,7 +79,7 @@ func (c *Client) Contexts(ctx context.Context) ([]Context, error) {
 	for _, item := range raw {
 		var apiErr APIError
 		if json.Unmarshal(item, &apiErr) == nil && apiErr.ErrorCode != 0 {
-			return nil, fmt.Errorf("toodledo contexts: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+			return nil, fmt.Errorf("toodledo contexts: %w", apiErr)
 		}
 		var ctxItem Context
 		if err := json.Unmarshal(item, &ctxItem); err != nil {
@@ -97,12 +106,12 @@ func (c *Client) Tasks(ctx context.Context) ([]Task, error) {
 
 	tasks := make([]Task, 0, len(raw)-1)
 	for i, item := range raw {
-		if i == 0 {
-			continue
-		}
 		var apiErr APIError
 		if json.Unmarshal(item, &apiErr) == nil && apiErr.ErrorCode != 0 {
-			return nil, fmt.Errorf("toodledo tasks: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+			return nil, fmt.Errorf("toodledo tasks: %w", apiErr)
+		}
+		if i == 0 {
+			continue
 		}
 		var task Task
 		if err := json.Unmarshal(item, &task); err != nil {
@@ -138,7 +147,7 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 	}
 	var apiErr APIError
 	if json.Unmarshal(raw[0], &apiErr) == nil && apiErr.ErrorCode != 0 {
-		return Task{}, fmt.Errorf("add task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+		return Task{}, fmt.Errorf("add task: %w", apiErr)
 	}
 	var added Task
 	if err := json.Unmarshal(raw[0], &added); err != nil {
@@ -174,7 +183,7 @@ func (c *Client) EditTask(ctx context.Context, task Task) (Task, error) {
 	}
 	var apiErr APIError
 	if json.Unmarshal(raw[0], &apiErr) == nil && apiErr.ErrorCode != 0 {
-		return Task{}, fmt.Errorf("edit task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+		return Task{}, fmt.Errorf("edit task: %w", apiErr)
 	}
 	var edited Task
 	if err := json.Unmarshal(raw[0], &edited); err != nil {
@@ -201,7 +210,7 @@ func (c *Client) CompleteTask(ctx context.Context, taskID int64, completedAt tim
 	for _, item := range raw {
 		var apiErr APIError
 		if json.Unmarshal(item, &apiErr) == nil && apiErr.ErrorCode != 0 {
-			return fmt.Errorf("complete task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+			return fmt.Errorf("complete task: %w", apiErr)
 		}
 	}
 	return nil
@@ -223,7 +232,7 @@ func (c *Client) DeleteTask(ctx context.Context, taskID int64) error {
 	for _, item := range raw {
 		var apiErr APIError
 		if json.Unmarshal(item, &apiErr) == nil && apiErr.ErrorCode != 0 {
-			return fmt.Errorf("delete task: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+			return fmt.Errorf("delete task: %w", apiErr)
 		}
 	}
 	return nil
@@ -244,11 +253,14 @@ func (c *Client) token(ctx context.Context, params url.Values) (Token, error) {
 	}
 	var apiErr APIError
 	if json.Unmarshal(body, &apiErr) == nil && apiErr.ErrorCode != 0 {
-		return Token{}, fmt.Errorf("token request: %d %s", apiErr.ErrorCode, apiErr.ErrorDesc)
+		return Token{}, fmt.Errorf("token request: %w", apiErr)
 	}
 	var token Token
 	if err := json.Unmarshal(body, &token); err != nil {
 		return Token{}, err
+	}
+	if token.AccessToken == "" || token.RefreshToken == "" || token.ExpiresIn <= 0 {
+		return Token{}, errors.New("toodledo returned an incomplete token response")
 	}
 	return token, nil
 }
@@ -306,6 +318,10 @@ func (c *Client) do(req *http.Request) ([]byte, error) {
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		if resp.StatusCode == http.StatusUnauthorized {
 			return nil, UnauthorizedError{Body: strings.TrimSpace(string(body))}
+		}
+		var apiErr APIError
+		if json.Unmarshal(body, &apiErr) == nil && apiErr.ErrorCode != 0 {
+			return nil, fmt.Errorf("toodledo http %d: %w", resp.StatusCode, apiErr)
 		}
 		return nil, fmt.Errorf("toodledo http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
