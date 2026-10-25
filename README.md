@@ -1,7 +1,7 @@
 # tuidledo
 
 [![build](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml/badge.svg)](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml)
-[![Coverage](https://img.shields.io/badge/Coverage-51.7%25-yellow)](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml)
+[![Coverage](https://img.shields.io/badge/Coverage-73.6%25-brightgreen)](https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml)
 
 Go TUI client for [Toodledo](https://www.toodledo.com/), focused on a
 [Master Your Now](https://www.michaellinenberger.com/AboutMYN.html) style task list.
