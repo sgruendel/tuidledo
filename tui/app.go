@@ -15,7 +15,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	datepicker "github.com/ethanefung/bubble-datepicker"
 
 	"github.com/sgruendel/tuidledo/config"
 	"github.com/sgruendel/tuidledo/myn"
@@ -141,8 +140,8 @@ type Model struct {
 	titleInput          textinput.Model
 	noteInput           textarea.Model
 	editPriority        toodledo.Priority
-	startPicker         datepicker.Model
-	duePicker           datepicker.Model
+	startPicker         datePicker
+	duePicker           datePicker
 	editContext         int64
 	deleteTaskID        int64
 	width               int
@@ -995,8 +994,8 @@ func (m *Model) clearCreateForm() {
 	m.editField = editFieldTitle
 	m.titleInput = textinput.Model{}
 	m.noteInput = textarea.Model{}
-	m.startPicker = datepicker.Model{}
-	m.duePicker = datepicker.Model{}
+	m.startPicker = datePicker{}
+	m.duePicker = datePicker{}
 }
 
 func (m *Model) clearEditForm() {
@@ -1006,8 +1005,8 @@ func (m *Model) clearEditForm() {
 	m.editPriority = toodledo.PriorityLow
 	m.titleInput = textinput.Model{}
 	m.noteInput = textarea.Model{}
-	m.startPicker = datepicker.Model{}
-	m.duePicker = datepicker.Model{}
+	m.startPicker = datePicker{}
+	m.duePicker = datePicker{}
 }
 
 func (m *Model) focusEditField(field editField) {
@@ -1022,9 +1021,9 @@ func (m *Model) focusEditField(field editField) {
 	case editFieldNote:
 		m.noteInput.Focus()
 	case editFieldStart:
-		m.startPicker.SetFocus(datepicker.FocusCalendar)
+		m.startPicker.Focus()
 	case editFieldDue:
-		m.duePicker.SetFocus(datepicker.FocusCalendar)
+		m.duePicker.Focus()
 	}
 }
 
@@ -1038,9 +1037,9 @@ func (m *Model) focusCreateField(field editField) {
 	case editFieldNote:
 		m.noteInput.Focus()
 	case editFieldStart:
-		m.startPicker.SetFocus(datepicker.FocusCalendar)
+		m.startPicker.Focus()
 	case editFieldDue:
-		m.duePicker.SetFocus(datepicker.FocusCalendar)
+		m.duePicker.Focus()
 	default:
 		m.titleInput.Focus()
 	}
@@ -1124,26 +1123,22 @@ func (m *Model) updateFocusedDatePicker(key string) {
 	}
 	switch key {
 	case "h", "left":
-		picker.Yesterday()
-		picker.SelectDate()
+		picker.Move(0, -1)
 	case "l", "right":
-		picker.Tomorrow()
-		picker.SelectDate()
+		picker.Move(0, 1)
 	case "j", "down":
-		picker.NextWeek()
-		picker.SelectDate()
+		picker.Move(0, 7)
 	case "k", "up":
-		picker.LastWeek()
-		picker.SelectDate()
+		picker.Move(0, -7)
 	case "H":
-		picker.LastMonth()
-		picker.SelectDate()
+		picker.Move(-1, 0)
 	case "L":
-		picker.NextMonth()
-		picker.SelectDate()
+		picker.Move(1, 0)
 	case "x":
 		picker.UnselectDate()
+		return
 	}
+	picker.SelectDate()
 }
 
 func (m Model) contextIDsForEdit() []int64 {
@@ -1479,7 +1474,7 @@ func (m Model) editView() string {
 		helpStyle.Render("tab next field | shift+tab previous | ctrl+s save | esc cancel | dates: h/j/k/l move, H/L month, enter select, x clear"))
 }
 
-func (m Model) dateFieldView(field editField, picker datepicker.Model) string {
+func (m Model) dateFieldView(field editField, picker datePicker) string {
 	marker := " "
 	if m.editField == field {
 		marker = ">"
@@ -1648,27 +1643,7 @@ func newNoteInput(value string, width int) textarea.Model {
 	return input
 }
 
-func newDatePicker(unix int64) datepicker.Model {
-	date := time.Now()
-	if unix != 0 {
-		date = time.Unix(unix, 0).UTC()
-	}
-	picker := datepicker.New(date)
-	picker.SetFocus(datepicker.FocusCalendar)
-	if unix != 0 {
-		picker.SelectDate()
-	}
-	return picker
-}
-
-func datePickerUnix(picker datepicker.Model) int64 {
-	if !picker.Selected {
-		return 0
-	}
-	return toodledo.NoonUnix(picker.Time)
-}
-
-func selectedDateText(picker datepicker.Model) string {
+func selectedDateText(picker datePicker) string {
 	if !picker.Selected {
 		return "(unset)"
 	}
@@ -1724,4 +1699,9 @@ var (
 	priorityHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(mochaBlue)
 	zebraStyle          = lipgloss.NewStyle().Background(mochaSurface0)
 	selectedStyle       = lipgloss.NewStyle().Foreground(mochaText).Background(mochaSurface2)
+
+	datePickerHeaderStyle   = lipgloss.NewStyle().Bold(true)
+	datePickerDayStyle      = lipgloss.NewStyle().Foreground(mochaOverlay1)
+	datePickerSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(mochaText)
+	datePickerFocusedStyle  = lipgloss.NewStyle().Bold(true).Foreground(mochaMauve)
 )
