@@ -61,6 +61,18 @@ Run the TUI:
 go run .
 ```
 
+Or install it to `~/.local/bin`:
+
+```sh
+make install
+```
+
+The installed binary runs outside the repository, where `.env.local` is not
+loaded, so `make build` and `make install` embed the credentials from your
+environment or `.env.local`. Use `make install PREFIX=/usr/local` for another
+location. `make uninstall` removes the binary and keeps `config.toml` and
+`state.json`.
+
 If you are running an official release binary, you do not need to set
 `TOODLEDO_CLIENT_ID` or `TOODLEDO_CLIENT_SECRET` because those values are embedded
 at build time by GitHub Actions.
@@ -205,6 +217,15 @@ In the edit form, `tab` / `shift+tab` switches between fields, `ctrl+s` saves,
 and `esc` cancels. Urgency and context fields cycle with `[` / `]` or `enter`.
 Date fields use `h` / `j` / `k` / `l`, `H` / `L` for months, `enter` to
 select, and `x` to clear.
+
+## Development
+
+```sh
+make test   # Tests and Go race detector; requires a C compiler
+make check  # go vet, gofmt, go mod tidy, and staticcheck
+make vuln   # govulncheck; needs network access
+make build  # Static binary in bin/ with CGO disabled
+```
 
 ## tmux Hyperlinks
 
