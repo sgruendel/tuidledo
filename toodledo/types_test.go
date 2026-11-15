@@ -3,6 +3,7 @@ package toodledo
 import (
 	"encoding/json/v2"
 	"testing"
+	"time"
 )
 
 func TestTaskUnmarshalAttachmentZero(t *testing.T) {
@@ -89,5 +90,26 @@ func TestPriorityJSONIsNumeric(t *testing.T) {
 	}
 	if string(data) != `{"priority":3}` {
 		t.Fatalf("marshaled priority = %s, want {\"priority\":3}", data)
+	}
+}
+
+func TestNoonUnixUsesCalendarDateInLocation(t *testing.T) {
+	newYork := time.FixedZone("EST", -5*60*60)
+	berlin := time.FixedZone("CET", 1*60*60)
+	tests := []struct {
+		name string
+		at   time.Time
+		want time.Time
+	}{
+		{"evening west of UTC", time.Date(2026, 11, 15, 20, 0, 0, 0, newYork), time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)},
+		{"after midnight east of UTC", time.Date(2026, 11, 16, 0, 30, 0, 0, berlin), time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)},
+		{"Toodledo date in UTC", time.Unix(time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC).Unix(), 0).UTC(), time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := NoonUnix(test.at); got != test.want.Unix() {
+				t.Fatalf("NoonUnix(%v) = %v, want %v", test.at, time.Unix(got, 0).UTC(), test.want)
+			}
+		})
 	}
 }

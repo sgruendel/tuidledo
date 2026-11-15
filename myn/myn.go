@@ -60,8 +60,8 @@ func DateLabelAt(unix int64, now time.Time) string {
 	if unix == 0 {
 		return "-"
 	}
-	date := dayStart(time.Unix(unix, 0).UTC())
-	today := dayStart(now.UTC())
+	date := taskDay(unix)
+	today := dayStart(now)
 	switch date.Sub(today) {
 	case -24 * time.Hour:
 		return "yesterday"
@@ -74,22 +74,30 @@ func DateLabelAt(unix int64, now time.Time) string {
 	}
 }
 
-// IsToday reports whether a Unix timestamp falls on today's UTC date.
+// IsToday reports whether a Toodledo date falls on now's calendar date.
 func IsToday(unix int64, now time.Time) bool {
 	if unix == 0 {
 		return false
 	}
-	return dayStart(time.Unix(unix, 0).UTC()).Equal(dayStart(now.UTC()))
+	return taskDay(unix).Equal(dayStart(now))
 }
 
-// IsPastDate reports whether a Unix timestamp falls before today's UTC date.
+// IsPastDate reports whether a Toodledo date falls before now's calendar date.
 func IsPastDate(unix int64, now time.Time) bool {
 	if unix == 0 {
 		return false
 	}
-	return dayStart(time.Unix(unix, 0).UTC()).Before(dayStart(now.UTC()))
+	return taskDay(unix).Before(dayStart(now))
 }
 
+// taskDay returns the calendar date of a Toodledo date-only timestamp, which
+// Toodledo stores as noon UTC.
+func taskDay(unix int64) time.Time {
+	return dayStart(time.Unix(unix, 0).UTC())
+}
+
+// dayStart returns midnight UTC on t's calendar date in t's location, so dates
+// from Toodledo and the local "today" compare by calendar day.
 func dayStart(t time.Time) time.Time {
 	y, m, d := t.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
