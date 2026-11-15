@@ -41,3 +41,53 @@ func TestTaskUnmarshalAttachmentArrayWithStringID(t *testing.T) {
 		t.Fatalf("Attachment = %#v", task.Attachment[0])
 	}
 }
+
+func TestPriorityString(t *testing.T) {
+	tests := map[Priority]string{
+		PriorityNegative: "Neg",
+		PriorityLow:      "Low",
+		PriorityMedium:   "Med",
+		PriorityHigh:     "High",
+		PriorityTop:      "Top",
+	}
+	for priority, want := range tests {
+		if got := priority.String(); got != want {
+			t.Fatalf("Priority(%d).String() = %q, want %q", int(priority), got, want)
+		}
+	}
+}
+
+func TestPriorityNextPrevWrap(t *testing.T) {
+	order := []Priority{PriorityLow, PriorityMedium, PriorityHigh, PriorityTop}
+	for i, priority := range order {
+		if got, want := priority.Next(), order[(i+1)%len(order)]; got != want {
+			t.Fatalf("%v.Next() = %v, want %v", priority, got, want)
+		}
+		if got, want := priority.Prev(), order[(i+len(order)-1)%len(order)]; got != want {
+			t.Fatalf("%v.Prev() = %v, want %v", priority, got, want)
+		}
+	}
+	if got := PriorityNegative.Next(); got != PriorityLow {
+		t.Fatalf("Negative.Next() = %v, want Low", got)
+	}
+	if got := PriorityNegative.Prev(); got != PriorityTop {
+		t.Fatalf("Negative.Prev() = %v, want Top", got)
+	}
+}
+
+func TestPriorityJSONIsNumeric(t *testing.T) {
+	var task Task
+	if err := json.Unmarshal([]byte(`{"id":1,"priority":-1}`), &task); err != nil {
+		t.Fatalf("unmarshal task: %v", err)
+	}
+	if task.Priority != PriorityNegative {
+		t.Fatalf("Priority = %v, want Negative", task.Priority)
+	}
+	data, err := json.Marshal(map[string]any{"priority": PriorityTop})
+	if err != nil {
+		t.Fatalf("marshal priority: %v", err)
+	}
+	if string(data) != `{"priority":3}` {
+		t.Fatalf("marshaled priority = %s, want {\"priority\":3}", data)
+	}
+}

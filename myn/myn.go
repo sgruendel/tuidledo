@@ -16,7 +16,7 @@ func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time
 
 	visible := make([]toodledo.Task, 0, len(tasks))
 	for _, task := range tasks {
-		if task.Completed != 0 || task.Priority < 0 {
+		if task.Completed != 0 || task.Priority < toodledo.PriorityLow {
 			continue
 		}
 		if task.StartDate != 0 && task.StartDate > today {
@@ -48,22 +48,6 @@ func VisibleTasks(tasks []toodledo.Task, contextID int64, query string, now time
 	})
 
 	return visible
-}
-
-// PriorityLabel returns the short display label for a Toodledo priority.
-func PriorityLabel(priority int) string {
-	switch priority {
-	case 3:
-		return "Top"
-	case 2:
-		return "High"
-	case 1:
-		return "Med"
-	case 0:
-		return "Low"
-	default:
-		return "Neg"
-	}
 }
 
 // DateLabel returns a relative display label for a Unix timestamp.

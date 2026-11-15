@@ -102,7 +102,7 @@ const (
 )
 
 type listRow struct {
-	priority int
+	priority toodledo.Priority
 	task     *toodledo.Task
 }
 
@@ -133,14 +133,14 @@ type Model struct {
 	visible             []toodledo.Task
 	rows                []listRow
 	cursor              int
-	activePriority      int
-	collapsedPriorities map[int]bool
+	activePriority      toodledo.Priority
+	collapsedPriorities map[toodledo.Priority]bool
 	query               string
 	editTaskID          int64
 	editField           editField
 	titleInput          textinput.Model
 	noteInput           textarea.Model
-	editPriority        int
+	editPriority        toodledo.Priority
 	startPicker         datepicker.Model
 	duePicker           datepicker.Model
 	editContext         int64
@@ -763,11 +763,11 @@ func (m Model) newTask(title, note string, now time.Time) toodledo.Task {
 	}
 }
 
-func (m Model) createPriority() int {
+func (m Model) createPriority() toodledo.Priority {
 	if priorityIn(m.activePriority, m.priorityGroups()) {
 		return m.activePriority
 	}
-	return 1
+	return toodledo.PriorityMedium
 }
 
 func (m Model) createdTaskValues() (string, string, error) {
@@ -916,11 +916,9 @@ func (m *Model) refreshVisible() {
 	base := m.baseVisibleTasks()
 	m.visible = make([]toodledo.Task, 0, len(base))
 	m.rows = make([]listRow, 0, len(base)+4)
-	lastPriority := -2
 	for _, task := range base {
-		if task.Priority != lastPriority {
+		if len(m.rows) == 0 || m.rows[len(m.rows)-1].priority != task.Priority {
 			m.rows = append(m.rows, listRow{priority: task.Priority})
-			lastPriority = task.Priority
 		}
 		if m.collapsedPriorities[task.Priority] {
 			continue
@@ -1005,7 +1003,7 @@ func (m *Model) clearEditForm() {
 	m.editTaskID = 0
 	m.editField = editFieldTitle
 	m.editContext = 0
-	m.editPriority = 0
+	m.editPriority = toodledo.PriorityLow
 	m.titleInput = textinput.Model{}
 	m.noteInput = textarea.Model{}
 	m.startPicker = datepicker.Model{}
@@ -1102,17 +1100,11 @@ func (m *Model) prevEditContext() {
 }
 
 func (m *Model) nextEditPriority() {
-	m.editPriority++
-	if m.editPriority > 3 {
-		m.editPriority = 0
-	}
+	m.editPriority = m.editPriority.Next()
 }
 
 func (m *Model) prevEditPriority() {
-	m.editPriority--
-	if m.editPriority < 0 {
-		m.editPriority = 3
-	}
+	m.editPriority = m.editPriority.Prev()
 }
 
 func (m *Model) selectFocusedDate() {
@@ -1224,7 +1216,7 @@ func (m *Model) prevPriority() {
 	m.setActivePriority(priorities[len(priorities)-1])
 }
 
-func (m *Model) setActivePriority(priority int) {
+func (m *Model) setActivePriority(priority toodledo.Priority) {
 	m.activePriority = priority
 	for i, row := range m.rows {
 		if row.priority == priority {
@@ -1267,7 +1259,7 @@ func (m *Model) toggleActivePriority() {
 		m.activePriority = priorities[0]
 	}
 	if m.collapsedPriorities == nil {
-		m.collapsedPriorities = make(map[int]bool)
+		m.collapsedPriorities = make(map[toodledo.Priority]bool)
 	}
 	m.collapsedPriorities[m.activePriority] = !m.collapsedPriorities[m.activePriority]
 	m.refreshVisible()
@@ -1283,7 +1275,7 @@ func (m *Model) setActivePriorityCollapsed(collapsed bool) {
 		m.activePriority = priorities[0]
 	}
 	if m.collapsedPriorities == nil {
-		m.collapsedPriorities = make(map[int]bool)
+		m.collapsedPriorities = make(map[toodledo.Priority]bool)
 	}
 	if m.collapsedPriorities[m.activePriority] == collapsed {
 		return
@@ -1293,10 +1285,10 @@ func (m *Model) setActivePriorityCollapsed(collapsed bool) {
 	m.setActivePriority(m.activePriority)
 }
 
-func (m Model) priorityGroups() []int {
+func (m Model) priorityGroups() []toodledo.Priority {
 	base := m.baseVisibleTasks()
-	priorities := make([]int, 0, 4)
-	seen := make(map[int]bool)
+	priorities := make([]toodledo.Priority, 0, 4)
+	seen := make(map[toodledo.Priority]bool)
 	for _, task := range base {
 		if !seen[task.Priority] {
 			seen[task.Priority] = true
@@ -1306,7 +1298,7 @@ func (m Model) priorityGroups() []int {
 	return priorities
 }
 
-func (m Model) priorityWarning(priority int, visible []toodledo.Task) (priorityWarning, bool) {
+func (m Model) priorityWarning(priority toodledo.Priority, visible []toodledo.Task) (priorityWarning, bool) {
 	if m.contextIndex == 0 {
 		return priorityWarning{}, false
 	}
@@ -1329,41 +1321,40 @@ func (m Model) priorityWarning(priority int, visible []toodledo.Task) (priorityW
 	return priorityWarning{count: count, max: max}, true
 }
 
-func (m Model) priorityMaxTasks(priority int) int {
+func (m Model) priorityMaxTasks(priority toodledo.Priority) int {
 	switch priority {
-	case 2:
+	case toodledo.PriorityHigh:
 		return m.config.MYN.CriticalNowMaxTasks
-	case 1:
+	case toodledo.PriorityMedium:
 		return m.config.MYN.OpportunityNowMaxTasks
 	default:
 		return 0
 	}
 }
 
-func (m Model) priorityLabel(priority int) string {
-	defaultLabel := myn.PriorityLabel(priority)
+func (m Model) priorityLabel(priority toodledo.Priority) string {
 	switch priority {
-	case 3:
+	case toodledo.PriorityTop:
 		if m.config.MYN.TopLabel != "" {
 			return m.config.MYN.TopLabel
 		}
-	case 2:
+	case toodledo.PriorityHigh:
 		if m.config.MYN.HighLabel != "" {
 			return m.config.MYN.HighLabel
 		}
-	case 1:
+	case toodledo.PriorityMedium:
 		if m.config.MYN.MedLabel != "" {
 			return m.config.MYN.MedLabel
 		}
-	case 0:
+	case toodledo.PriorityLow:
 		if m.config.MYN.LowLabel != "" {
 			return m.config.MYN.LowLabel
 		}
 	}
-	return defaultLabel
+	return priority.String()
 }
 
-func priorityIn(priority int, priorities []int) bool {
+func priorityIn(priority toodledo.Priority, priorities []toodledo.Priority) bool {
 	return slices.Contains(priorities, priority)
 }
 
@@ -1412,16 +1403,16 @@ func (m Model) taskView() string {
 	if len(base) == 0 {
 		b.WriteString("No visible MYN tasks.\n")
 	} else {
-		lastPriority := -2
 		row := 0
 		for rowIndex, listRow := range m.rows {
 			if listRow.task == nil {
-				if rowIndex > 0 && listRow.priority != lastPriority {
+				// Each priority group has exactly one header row, so every header
+				// after the first starts a new group.
+				if rowIndex > 0 {
 					b.WriteByte('\n')
 				}
 				b.WriteString(m.priorityHeaderView(listRow.priority, base, rowIndex == m.cursor))
 				b.WriteByte('\n')
-				lastPriority = listRow.priority
 				continue
 			}
 
@@ -1500,7 +1491,7 @@ func (m Model) dateFieldView(field editField, picker datepicker.Model) string {
 	return fmt.Sprintf("%s %s\n%s", marker, label, picker.View())
 }
 
-func (m Model) priorityHeaderView(priority int, base []toodledo.Task, selected bool) string {
+func (m Model) priorityHeaderView(priority toodledo.Priority, base []toodledo.Task, selected bool) string {
 	header := m.priorityLabel(priority)
 	if selected {
 		header = "> " + header
