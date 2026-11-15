@@ -3,7 +3,9 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadReturnsDefaultsWhenConfigMissing(t *testing.T) {
@@ -19,6 +21,30 @@ func TestLoadReturnsDefaultsWhenConfigMissing(t *testing.T) {
 	}
 	if cfg.MYN.OpportunityNowMaxTasks != 20 {
 		t.Fatalf("OpportunityNowMaxTasks = %d, want 20", cfg.MYN.OpportunityNowMaxTasks)
+	}
+	if got := time.Weekday(cfg.UI.WeekStart); got != time.Sunday {
+		t.Fatalf("WeekStart = %v, want Sunday", got)
+	}
+}
+
+func TestLoadReadsWeekStart(t *testing.T) {
+	writeConfig(t, "[ui]\nweek_start = \"Monday\"\n")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := time.Weekday(cfg.UI.WeekStart); got != time.Monday {
+		t.Fatalf("WeekStart = %v, want Monday", got)
+	}
+}
+
+func TestLoadRejectsInvalidWeekStart(t *testing.T) {
+	writeConfig(t, "[ui]\nweek_start = \"mon\"\n")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), `invalid weekday "mon"`) {
+		t.Fatalf("Load() error = %v, want invalid weekday error", err)
 	}
 }
 
@@ -58,6 +84,22 @@ func TestLoadReadsTOMLAndAppliesDefaultsForMissingValues(t *testing.T) {
 	}
 	if cfg.MYN.TopLabel != "Top" {
 		t.Fatalf("TopLabel = %q, want Top", cfg.MYN.TopLabel)
+	}
+}
+
+func writeConfig(t *testing.T, content string) {
+	t.Helper()
+	root := t.TempDir()
+	setConfigHome(t, filepath.Join(root, "home"), filepath.Join(root, "config"))
+	path, err := Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

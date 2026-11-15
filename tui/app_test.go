@@ -538,7 +538,7 @@ func TestEditMsgSelectsUpdatedTaskRow(t *testing.T) {
 
 func TestDatePickerUnix(t *testing.T) {
 	date := time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC)
-	picker := newDatePicker(toodledo.NoonUnix(date))
+	picker := newDatePicker(toodledo.NoonUnix(date), time.Sunday)
 	if got := datePickerUnix(picker); got != toodledo.NoonUnix(date) {
 		t.Fatalf("datePickerUnix(selected) = %d", got)
 	}

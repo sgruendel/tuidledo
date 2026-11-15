@@ -17,7 +17,9 @@ type datePicker struct {
 	Time time.Time
 	// Selected reports whether Time is the chosen date or the field is unset.
 	Selected bool
-	focused  bool
+	// weekStart is the weekday shown in the first column.
+	weekStart time.Weekday
+	focused   bool
 }
 
 const datePickerCellWidth = 4
@@ -35,12 +37,13 @@ func (p *datePicker) Move(months, days int) {
 	p.Time = p.Time.AddDate(0, months, days)
 }
 
-// View renders the month containing Time, with weeks starting on Sunday.
+// View renders the month containing Time, with weeks starting on weekStart.
 func (p datePicker) View() string {
 	year, month, selectedDay := p.Time.Date()
 	first := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 	daysInMonth := first.AddDate(0, 1, -1).Day()
-	leading := int(first.Weekday())
+	days := len(weekdayHeaders)
+	leading := (int(first.Weekday()) - int(p.weekStart) + days) % days
 
 	gridWidth := len(weekdayHeaders) * datePickerCellWidth
 	var b strings.Builder
@@ -49,12 +52,13 @@ func (p datePicker) View() string {
 		datePickerHeaderStyle.Render(fmt.Sprintf("%s %d", month, year))))
 	b.WriteString("\n\n")
 
-	for _, header := range weekdayHeaders {
+	for i := range days {
+		header := weekdayHeaders[(int(p.weekStart)+i)%days]
 		b.WriteString(datePickerHeaderStyle.Render(datePickerCell(header)))
 	}
 
 	for i := range leading + daysInMonth {
-		if i%len(weekdayHeaders) == 0 {
+		if i%days == 0 {
 			b.WriteString("\n\n")
 		}
 		if i < leading {
@@ -79,12 +83,12 @@ func datePickerCell(text string) string {
 	return fmt.Sprintf(" %-2s ", text)
 }
 
-func newDatePicker(unix int64) datePicker {
+func newDatePicker(unix int64, weekStart time.Weekday) datePicker {
 	date := time.Now()
 	if unix != 0 {
 		date = time.Unix(unix, 0).UTC()
 	}
-	picker := datePicker{Time: date, Selected: unix != 0}
+	picker := datePicker{Time: date, Selected: unix != 0, weekStart: weekStart}
 	picker.Focus()
 	return picker
 }
