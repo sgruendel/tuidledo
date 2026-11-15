@@ -121,7 +121,9 @@ func TestAPIResponseErrorsRemainInspectable(t *testing.T) {
 	}
 }
 
-func TestAddTaskIncludesNote(t *testing.T) {
+func TestAddTaskSendsFormFields(t *testing.T) {
+	startDate := NoonUnix(time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC))
+	dueDate := NoonUnix(time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC))
 	server := httptest.NewTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
@@ -134,10 +136,20 @@ func TestAddTaskIncludesNote(t *testing.T) {
 		if len(tasks) != 1 {
 			t.Fatalf("tasks len = %d, want 1", len(tasks))
 		}
-		if tasks[0]["note"] != "new note" {
-			t.Fatalf("note payload = %#v, want new note", tasks[0]["note"])
+		want := map[string]any{
+			"title":     "new task",
+			"note":      "new note",
+			"priority":  float64(PriorityHigh),
+			"startdate": float64(startDate),
+			"duedate":   float64(dueDate),
+			"context":   float64(20),
 		}
-		_, _ = io.WriteString(w, `[{"id":1,"title":"new task","note":"new note","priority":1,"startdate":0,"context":0}]`)
+		for field, value := range want {
+			if tasks[0][field] != value {
+				t.Fatalf("%s payload = %#v, want %#v", field, tasks[0][field], value)
+			}
+		}
+		_, _ = io.WriteString(w, `[{"id":1,"title":"new task","note":"new note","priority":2,"startdate":0,"context":20}]`)
 	}))
 
 	client := NewClient("", "", "token")
@@ -147,7 +159,10 @@ func TestAddTaskIncludesNote(t *testing.T) {
 	apiBaseURL = server.URL
 	defer func() { apiBaseURL = oldBaseURL }()
 
-	_, err := client.AddTask(t.Context(), Task{Title: "new task", Note: "new note"})
+	_, err := client.AddTask(t.Context(), Task{
+		Title: "new task", Note: "new note", Priority: PriorityHigh,
+		StartDate: startDate, DueDate: dueDate, Context: 20,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

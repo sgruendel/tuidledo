@@ -129,6 +129,7 @@ func (c *Client) AddTask(ctx context.Context, task Task) (Task, error) {
 		"note":      task.Note,
 		"priority":  task.Priority,
 		"startdate": task.StartDate,
+		"duedate":   task.DueDate,
 		"context":   task.Context,
 	}})
 	if err != nil {
