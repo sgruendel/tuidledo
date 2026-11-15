@@ -1,8 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -17,6 +20,29 @@ const (
 // Config contains user-configurable application settings.
 type Config struct {
 	MYN MYNConfig `toml:"myn"`
+	UI  UIConfig  `toml:"ui"`
+}
+
+// UIConfig contains general display settings.
+type UIConfig struct {
+	// WeekStart is the first day of the week in date pickers. Defaults to Sunday.
+	WeekStart Weekday `toml:"week_start"`
+}
+
+// Weekday is a day of the week, written in config.toml by its English name.
+// The zero value is Sunday.
+type Weekday time.Weekday
+
+// UnmarshalText parses an English weekday name such as "monday", ignoring case.
+func (d *Weekday) UnmarshalText(text []byte) error {
+	name := strings.TrimSpace(string(text))
+	for day := time.Sunday; day <= time.Saturday; day++ {
+		if strings.EqualFold(name, day.String()) {
+			*d = Weekday(day)
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid weekday %q: use a day name such as \"sunday\" or \"monday\"", name)
 }
 
 // MYNConfig contains settings for Michael Linenberger-style task views.

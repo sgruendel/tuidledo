@@ -974,8 +974,8 @@ func (m *Model) startEditForm(task toodledo.Task) {
 	m.editPriority = task.Priority
 	m.titleInput = newTitleInput(task.Title, m.width)
 	m.noteInput = newNoteInput(task.Note, m.width)
-	m.startPicker = newDatePicker(task.StartDate)
-	m.duePicker = newDatePicker(task.DueDate)
+	m.startPicker = newDatePicker(task.StartDate, m.weekStart())
+	m.duePicker = newDatePicker(task.DueDate, m.weekStart())
 	m.state = stateEditTask
 	m.focusEditField(editFieldTitle)
 }
@@ -984,8 +984,8 @@ func (m *Model) startCreateForm() {
 	m.message = ""
 	m.titleInput = newTitleInput("", m.width)
 	m.noteInput = newNoteInput("", m.width)
-	m.startPicker = newDatePicker(toodledo.NoonUnix(time.Now()))
-	m.duePicker = newDatePicker(0)
+	m.startPicker = newDatePicker(toodledo.NoonUnix(time.Now()), m.weekStart())
+	m.duePicker = newDatePicker(0, m.weekStart())
 	m.state = stateCreate
 	m.focusCreateField(editFieldTitle)
 }
@@ -1139,6 +1139,10 @@ func (m *Model) updateFocusedDatePicker(key string) {
 		return
 	}
 	picker.SelectDate()
+}
+
+func (m Model) weekStart() time.Weekday {
+	return time.Weekday(m.config.UI.WeekStart)
 }
 
 func (m Model) contextIDsForEdit() []int64 {

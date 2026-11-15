@@ -167,6 +167,13 @@ low_label = "Over the Horizon"
 The urgency labels are optional. If omitted, tuidledo uses `Top`, `High`, `Med`,
 and `Low` for the mapped Toodledo priorities.
 
+Date pickers start the week on Sunday. To start on Monday (or any other day), add:
+
+```toml
+[ui]
+week_start = "monday"
+```
+
 `config.toml` lives in your user config directory:
 
 - Linux: `$XDG_CONFIG_HOME/tuidledo/config.toml`, or `~/.config/tuidledo/config.toml`
