@@ -21,11 +21,11 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Builds with the Go version go.mod declares, the module's minimum.
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
@@ -52,7 +52,7 @@ jobs:
         run: go build .
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: |
@@ -66,13 +66,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # govulncheck also checks the standard library of the Go it runs with.
       # Use the latest release, as users building today would, rather than
       # the older patch release that go.mod names as the minimum.
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
           check-latest: true
@@ -94,7 +94,7 @@ jobs:
 
     steps:
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
 
@@ -109,20 +109,20 @@ jobs:
 
       - name: Set up Go
         if: steps.current.outputs.update == 'true'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Download coverage reports
         if: steps.current.outputs.update == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage
 
       - name: Update coverage badge
         if: steps.current.outputs.update == 'true'
-        uses: tj-actions/coverage-badge-go@481919ec72da287775fef015fd9011dc75a5db05 # v3
+        uses: tj-actions/coverage-badge-go@481919ec72da287775fef015fd9011dc75a5db05 # v3.0.0
         with:
           filename: coverage-summary.out
           link: https://github.com/sgruendel/tuidledo/actions/workflows/build.yaml
@@ -173,13 +173,13 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Release binaries embed the standard library, so build them with the
       # latest Go release to include its security fixes. The test job still
       # checks the minimum version from go.mod.
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
           check-latest: true
@@ -223,7 +223,7 @@ jobs:
           sha256sum "$archive_path" > "$archive_path.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tuidledo_${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}_${{ matrix.asset_suffix }}
           path: |
@@ -232,7 +232,7 @@ jobs:
 
       - name: Publish GitHub release asset
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             dist/tuidledo_${{ github.ref_name }}_${{ matrix.asset_suffix }}.${{ matrix.archive_ext }}
