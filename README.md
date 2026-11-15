@@ -87,13 +87,16 @@ go build -ldflags "-X main.version=0.1.0 -X main.clientID=$TOODLEDO_CLIENT_ID -X
 
 The GitHub Actions workflow:
 
-- checks formatting, runs race-enabled tests and `go vet`, and builds on pushes
-  and pull requests
+- checks formatting and that `go.mod` is tidy, runs race-enabled tests,
+  `go vet`, and staticcheck, and builds on pushes and pull requests
+- runs govulncheck with the latest Go release on pushes, pull requests, and
+  weekly, so newly published vulnerabilities surface without a push
 - uploads a coverage profile and function summary after successful test jobs
 - updates the README coverage badge after successful pushes and manual runs on
   `main`, skipping results if `main` has advanced since testing
 - builds downloadable archives for Linux x86_64, Windows x86_64, macOS x86_64,
-  and macOS arm64 on tags like `v0.1.0`
+  and macOS arm64 on tags like `v0.1.0`, using the latest Go release so the
+  binaries include its standard library security fixes
 - publishes a matching `.sha256` checksum file for each release archive
 
 The badge job needs permission to push to `main`, including any branch rules.
