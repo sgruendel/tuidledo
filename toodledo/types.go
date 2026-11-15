@@ -121,8 +121,11 @@ func (e APIError) Error() string {
 	return fmt.Sprintf("toodledo API %d: %s", e.ErrorCode, e.ErrorDesc)
 }
 
-// NoonUnix returns the Unix timestamp for noon UTC on t's date.
+// NoonUnix returns the Unix timestamp for noon UTC on t's calendar date in t's
+// location, which is how Toodledo encodes date-only fields such as startdate,
+// duedate and completed. Pass local time for "today" and a UTC time for a date
+// that came from Toodledo.
 func NoonUnix(t time.Time) int64 {
-	y, m, d := t.UTC().Date()
+	y, m, d := t.Date()
 	return time.Date(y, m, d, 12, 0, 0, 0, time.UTC).Unix()
 }

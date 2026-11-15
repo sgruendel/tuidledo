@@ -113,3 +113,40 @@ func taskIDs(tasks []toodledo.Task) []int64 {
 	}
 	return ids
 }
+
+func TestDatesUseLocalCalendarDay(t *testing.T) {
+	// In both cases the local date is a day off from the UTC date.
+	tests := []struct {
+		name string
+		now  time.Time
+	}{
+		{"evening in New York", time.Date(2026, 11, 15, 20, 0, 0, 0, time.FixedZone("EST", -5*60*60))},
+		{"after midnight in Berlin", time.Date(2026, 11, 15, 0, 30, 0, 0, time.FixedZone("CET", 1*60*60))},
+	}
+	day := func(d int) int64 { return time.Date(2026, 11, d, 12, 0, 0, 0, time.UTC).Unix() }
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for unix, want := range map[int64]string{day(14): "yesterday", day(15): "today", day(16): "tomorrow"} {
+				if got := DateLabelAt(unix, test.now); got != want {
+					t.Errorf("DateLabelAt(%v) = %q, want %q", time.Unix(unix, 0).UTC(), got, want)
+				}
+			}
+			if !IsToday(day(15), test.now) || IsToday(day(16), test.now) {
+				t.Error("IsToday does not match the local date")
+			}
+			if IsPastDate(day(15), test.now) || !IsPastDate(day(14), test.now) {
+				t.Error("IsPastDate does not match the local date")
+			}
+
+			tasks := []toodledo.Task{
+				{ID: 1, Title: "starts today", StartDate: day(15)},
+				{ID: 2, Title: "starts tomorrow", StartDate: day(16)},
+			}
+			visible := VisibleTasks(tasks, 0, "", test.now)
+			if len(visible) != 1 || visible[0].ID != 1 {
+				t.Fatalf("VisibleTasks = %v, want only the task starting today", visible)
+			}
+		})
+	}
+}
